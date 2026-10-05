@@ -17,6 +17,15 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body class="dark-theme">
+    <script>
+        (function() {
+            var savedTheme = localStorage.getItem('finboard_theme') || 'dark';
+            if (savedTheme === 'light') {
+                document.body.classList.remove('dark-theme');
+                document.body.classList.add('light-theme');
+            }
+        })();
+    </script>
     
     <!-- Background elements for blur and gradient effects -->
     <div class="bg-glow bg-glow-1"></div>
@@ -33,9 +42,14 @@
                         <i data-lucide="trending-up" class="logo-icon"></i>
                         <span>finboard</span>
                     </div>
-                    <button id="btn-toggle-privacy-home" class="btn btn-secondary btn-icon-only" title="Nascondi/Mostra Valori" style="border-radius: 50%; width: 40px; height: 40px;">
-                        <i data-lucide="eye" id="privacy-icon-home"></i>
-                    </button>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button id="btn-toggle-theme-home" class="btn btn-secondary btn-icon-only" title="Passa a Tema Chiaro" style="border-radius: 50%; width: 40px; height: 40px;">
+                            <i data-lucide="sun" id="theme-icon-home"></i>
+                        </button>
+                        <button id="btn-toggle-privacy-home" class="btn btn-secondary btn-icon-only" title="Nascondi/Mostra Valori" style="border-radius: 50%; width: 40px; height: 40px;">
+                            <i data-lucide="eye" id="privacy-icon-home"></i>
+                        </button>
+                    </div>
                 </div>
                 <h1>Benvenuto su Finboard</h1>
                 <p class="subtitle">Gestisci, analizza e traccia i tuoi portafogli finanziari in tempo reale.</p>
@@ -220,7 +234,7 @@
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Liquidità</span>
-                        <span class="stat-value" id="global-cash" title="Clicca per modificare la liquidità" style="cursor: pointer; border-bottom: 1px dashed rgba(255, 255, 255, 0.3); padding-bottom: 1px;">€ 0.00</span>
+                        <span class="stat-value" id="global-cash" title="Clicca per modificare la liquidità" style="cursor: pointer; border-bottom: 1px dashed var(--color-text-secondary); padding-bottom: 1px;">€ 0.00</span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Rendimento Totale</span>
@@ -229,6 +243,9 @@
                 </div>
 
                 <div class="header-right">
+                    <button id="btn-toggle-theme" class="btn btn-secondary btn-icon-only" title="Passa a Tema Chiaro">
+                        <i data-lucide="sun" id="theme-icon"></i>
+                    </button>
                     <button id="btn-connect-folder-header" class="btn btn-secondary btn-icon-only" title="Connessione Cartella Progetto">
                         <i data-lucide="folder-off" id="folder-header-icon" class="text-danger"></i>
                     </button>
@@ -504,35 +521,35 @@
                             <div class="card-header flex-between flex-wrap" style="gap: 16px;">
                                 <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
                                     <h2>Titoli in Portafoglio</h2>
-                                    <div id="market-indicators" style="display: flex; align-items: center; gap: 12px; font-size: 0.76rem; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 4px 12px; flex-wrap: wrap;">
+                                    <div id="market-indicators" style="display: flex; align-items: center; gap: 12px; font-size: 0.76rem; background: var(--color-bg-surface); border: 1px solid var(--color-border); border-radius: 6px; padding: 4px 12px; flex-wrap: wrap;">
                                         <div style="color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px;">
                                             <span style="font-weight: 600; color: #f59e0b;">BTC:</span>
-                                            <span id="val-btc" style="color: #ffffff; font-weight: 600; letter-spacing: 0.3px;">$ 67,540.00</span>
+                                            <span id="val-btc" style="color: var(--color-text-primary); font-weight: 600; letter-spacing: 0.3px;">$ 67,540.00</span>
                                         </div>
-                                        <span style="color: rgba(255,255,255,0.12)">|</span>
+                                        <span style="color: var(--color-border)">|</span>
                                         <div style="color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px;">
                                             <span style="font-weight: 600; color: #10b981;">S&P 500:</span>
-                                            <span id="val-sp500" style="color: #ffffff; font-weight: 600; letter-spacing: 0.3px;">5,280.00 pt</span>
+                                            <span id="val-sp500" style="color: var(--color-text-primary); font-weight: 600; letter-spacing: 0.3px;">5,280.00 pt</span>
                                         </div>
-                                        <span style="color: rgba(255,255,255,0.12)">|</span>
+                                        <span style="color: var(--color-border)">|</span>
                                         <div style="color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px;">
                                             <span style="font-weight: 600; color: #ec4899;">Russell 2000:</span>
-                                            <span id="val-russell" style="color: #ffffff; font-weight: 600; letter-spacing: 0.3px;">2,050.00 pt</span>
+                                            <span id="val-russell" style="color: var(--color-text-primary); font-weight: 600; letter-spacing: 0.3px;">2,050.00 pt</span>
                                         </div>
-                                        <span style="color: rgba(255,255,255,0.12)">|</span>
+                                        <span style="color: var(--color-border)">|</span>
                                         <div style="color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px;">
                                             <span style="font-weight: 600; color: #3b82f6;">EUR/USD:</span>
-                                            <span id="val-eurusd" style="color: #ffffff; font-weight: 600; letter-spacing: 0.3px;">1.0850</span>
+                                            <span id="val-eurusd" style="color: var(--color-text-primary); font-weight: 600; letter-spacing: 0.3px;">1.0850</span>
                                         </div>
-                                        <span style="color: rgba(255,255,255,0.12)">|</span>
+                                        <span style="color: var(--color-border)">|</span>
                                         <div style="color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px;">
                                             <span style="font-weight: 600; color: #14b8a6;">BTP 10Y:</span>
-                                            <span id="val-btp10y" style="color: #ffffff; font-weight: 600; letter-spacing: 0.3px;">3.85%</span>
+                                            <span id="val-btp10y" style="color: var(--color-text-primary); font-weight: 600; letter-spacing: 0.3px;">3.85%</span>
                                         </div>
-                                        <span style="color: rgba(255,255,255,0.12)">|</span>
+                                        <span style="color: var(--color-border)">|</span>
                                         <div style="color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px;">
                                             <span style="font-weight: 600; color: #f97316;">US 10Y:</span>
-                                            <span id="val-us10y" style="color: #ffffff; font-weight: 600; letter-spacing: 0.3px;">4.45%</span>
+                                            <span id="val-us10y" style="color: var(--color-text-primary); font-weight: 600; letter-spacing: 0.3px;">4.45%</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1000,6 +1017,9 @@
                 </div>
 
                 <div class="header-right">
+                    <button id="btn-toggle-theme-aggregate" class="btn btn-secondary btn-icon-only" title="Passa a Tema Chiaro">
+                        <i data-lucide="sun" id="theme-icon-aggregate"></i>
+                    </button>
                     <button id="btn-toggle-privacy-aggregate" class="btn btn-secondary btn-icon-only" title="Nascondi/Mostra Valori">
                         <i data-lucide="eye" id="privacy-icon-aggregate"></i>
                     </button>

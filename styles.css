@@ -44,6 +44,33 @@
     --transition-slow: 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Light Theme Variables */
+body.light-theme {
+    /* Color Palette: Clean Modern Light Slate */
+    --color-bg-canvas: #f8fafc;
+    --color-bg-surface: rgba(255, 255, 255, 0.88);
+    --color-bg-surface-opaque: #ffffff;
+    --color-border: rgba(15, 23, 42, 0.08);
+    --color-border-hover: rgba(15, 23, 42, 0.16);
+    
+    /* Text colors */
+    --color-text-primary: #0f172a;
+    --color-text-secondary: #475569;
+    --color-text-muted: #94a3b8;
+    
+    /* Brand & Accent Colors */
+    --color-accent-primary: #2563eb;
+    --color-accent-primary-hover: #1d4ed8;
+    --color-accent-success: #059669;
+    --color-accent-success-hover: #047857;
+    --color-accent-danger: #dc2626;
+    --color-accent-danger-hover: #b91c1c;
+    --color-accent-warning: #d97706;
+
+    /* Glassmorphism properties */
+    --glass-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
+}
+
 /* Reset and Base Styles */
 * {
     margin: 0;
@@ -60,6 +87,7 @@ body {
     position: relative;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
 /* 2. Abstract Glowing Backgrounds */
@@ -483,7 +511,7 @@ textarea {
     font-size: 2.2rem;
     font-weight: 800;
     letter-spacing: -0.04em;
-    color: #ffffff;
+    color: var(--color-text-primary);
     margin-bottom: 20px;
 }
 
@@ -2028,4 +2056,351 @@ textarea {
     align-items: center;
     flex-wrap: wrap;
 }
+
+/* ==========================================================================
+   LIGHT THEME OVERRIDES & COMPONENT STYLING
+   ========================================================================== */
+
+/* Background Glow Effect */
+body.light-theme .bg-glow {
+    opacity: 0.07;
+}
+
+/* Secondary & Icon Buttons */
+body.light-theme .btn-secondary {
+    background-color: #ffffff;
+    border-color: rgba(15, 23, 42, 0.12);
+    color: var(--color-text-primary);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .btn-secondary:hover {
+    background-color: #f8fafc;
+    border-color: rgba(15, 23, 42, 0.22);
+}
+
+body.light-theme .btn-tiny:hover,
+body.light-theme .btn-icon-close:hover,
+body.light-theme .btn-clear:hover {
+    background-color: rgba(15, 23, 42, 0.06);
+    color: var(--color-text-primary);
+}
+
+/* Modals */
+body.light-theme .modal-backdrop {
+    background: rgba(15, 23, 42, 0.4);
+}
+
+body.light-theme .modal-card {
+    background: #ffffff;
+    border-color: rgba(15, 23, 42, 0.1);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .modal-footer {
+    background: #f8fafc;
+    border-top-color: rgba(15, 23, 42, 0.08);
+}
+
+/* Forms & Inputs */
+body.light-theme input[type="text"],
+body.light-theme input[type="number"],
+body.light-theme input[type="date"],
+body.light-theme select,
+body.light-theme textarea {
+    background-color: #ffffff;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+
+body.light-theme input[type="text"]:focus,
+body.light-theme input[type="number"]:focus,
+body.light-theme input[type="date"]:focus,
+body.light-theme select:focus,
+body.light-theme textarea:focus {
+    background-color: #ffffff;
+    border-color: var(--color-accent-primary);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+body.light-theme input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: none;
+    opacity: 0.6;
+}
+
+body.light-theme select option {
+    background-color: #ffffff;
+    color: #0f172a;
+}
+
+/* Portfolio Cards in Selector */
+body.light-theme .portfolio-card {
+    background: #ffffff;
+    border-color: rgba(15, 23, 42, 0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+body.light-theme .portfolio-card:hover {
+    background: #ffffff;
+    border-color: rgba(37, 99, 235, 0.4);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.09);
+}
+
+body.light-theme .portfolio-card.is-selected {
+    background: rgba(37, 99, 235, 0.04);
+    border-color: var(--color-accent-primary);
+    box-shadow: 0 0 16px rgba(37, 99, 235, 0.15);
+}
+
+body.light-theme .folder-sync-status-box {
+    background: #ffffff !important;
+    border-color: rgba(15, 23, 42, 0.08) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+/* Dropdown & Navigation */
+body.light-theme .active-portfolio-btn {
+    background: #ffffff;
+    border-color: rgba(15, 23, 42, 0.12);
+    color: #0f172a;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .active-portfolio-btn:hover {
+    background: #f8fafc;
+    border-color: rgba(15, 23, 42, 0.22);
+}
+
+body.light-theme .dropdown-content {
+    background: #ffffff;
+    border-color: rgba(15, 23, 42, 0.1);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .dropdown-item {
+    color: #475569;
+}
+
+body.light-theme .dropdown-item:hover {
+    background: rgba(37, 99, 235, 0.06);
+    color: #0f172a;
+}
+
+body.light-theme .dropdown-item.active {
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--color-accent-primary);
+}
+
+/* Tabs */
+body.light-theme .tab-btn {
+    color: #64748b;
+}
+
+body.light-theme .tab-btn:hover {
+    color: #0f172a;
+}
+
+body.light-theme .tab-btn.active {
+    color: var(--color-accent-primary);
+}
+
+/* Tables */
+body.light-theme .holdings-table th {
+    border-bottom-color: rgba(15, 23, 42, 0.1);
+    color: #64748b;
+}
+
+body.light-theme .holdings-table th[data-sort]:hover {
+    color: #0f172a;
+}
+
+body.light-theme .holdings-table td {
+    border-bottom-color: rgba(15, 23, 42, 0.06);
+}
+
+body.light-theme .holdings-table tbody tr:hover {
+    background-color: rgba(15, 23, 42, 0.02);
+}
+
+body.light-theme .holdings-table tbody tr.year-summary-row {
+    background-color: rgba(15, 23, 42, 0.035);
+}
+
+body.light-theme .holdings-table tbody tr.year-summary-row:hover {
+    background-color: rgba(15, 23, 42, 0.05);
+}
+
+/* Badges */
+body.light-theme .badge-accent {
+    background-color: rgba(37, 99, 235, 0.1);
+    color: #1d4ed8;
+}
+
+body.light-theme .badge-success {
+    background-color: rgba(5, 150, 105, 0.1);
+    color: #047857;
+}
+
+body.light-theme .badge-danger {
+    background-color: rgba(220, 38, 38, 0.1);
+    color: #b91c1c;
+}
+
+/* Market Status Badge */
+body.light-theme .market-status-badge {
+    background: #ffffff;
+    border-color: rgba(15, 23, 42, 0.1);
+    color: #475569;
+}
+
+/* Chart Controls & Date Inputs */
+body.light-theme .chart-controls {
+    background: rgba(15, 23, 42, 0.02);
+    border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+
+body.light-theme .date-inputs input[type="date"] {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    color: #0f172a;
+}
+
+body.light-theme .card.chart-fullscreen {
+    background: #f8fafc !important;
+}
+
+/* Search Autocomplete & Detail */
+body.light-theme .search-autocomplete-box {
+    background: #ffffff;
+    border-color: rgba(15, 23, 42, 0.1);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+body.light-theme .search-suggestion-item {
+    border-bottom-color: rgba(15, 23, 42, 0.04);
+}
+
+body.light-theme .search-suggestion-item:hover {
+    background: rgba(37, 99, 235, 0.06);
+}
+
+body.light-theme .stock-detail-card {
+    background: #ffffff;
+    border-color: rgba(15, 23, 42, 0.08);
+}
+
+/* Aggregate View Screen */
+body.light-theme .aggregate-pie-container,
+body.light-theme .aggregate-legend-container,
+body.light-theme .aggregate-portfolios-card {
+    background: #ffffff;
+    border-color: rgba(15, 23, 42, 0.08);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+body.light-theme .aggregate-port-item {
+    background: #f8fafc;
+    border-color: rgba(15, 23, 42, 0.06);
+}
+
+body.light-theme .aggregate-port-item:hover {
+    background: #ffffff;
+    border-color: rgba(37, 99, 235, 0.3);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.06);
+}
+
+body.light-theme .aggregate-port-item .port-pct-bar-bg {
+    background: rgba(15, 23, 42, 0.08);
+}
+
+body.light-theme .aggregate-legend-table th {
+    border-bottom-color: rgba(15, 23, 42, 0.08);
+    color: #64748b;
+}
+
+body.light-theme .aggregate-legend-table td {
+    border-bottom-color: rgba(15, 23, 42, 0.04);
+}
+
+body.light-theme .aggregate-badge {
+    background: rgba(37, 99, 235, 0.08);
+    border-color: rgba(37, 99, 235, 0.2);
+    color: #1d4ed8;
+}
+
+/* Typology Management & Dropdowns */
+body.light-theme .typology-card-item {
+    background: #ffffff;
+    border-color: rgba(15, 23, 42, 0.08);
+}
+
+body.light-theme .typology-card-item:hover {
+    border-color: rgba(15, 23, 42, 0.16);
+    background: #f8fafc;
+}
+
+body.light-theme .typology-split-preview {
+    background: #e2e8f0;
+    border-color: rgba(15, 23, 42, 0.08);
+}
+
+body.light-theme .typology-select-dropdown {
+    background-color: #ffffff;
+    border-color: #cbd5e1;
+    color: #0f172a;
+    background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba%2815%2C23%2C42%2C0.6%29' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+body.light-theme .typology-select-dropdown option {
+    background-color: #ffffff;
+    color: #0f172a;
+}
+
+/* Collapsible Card & File Drop Area */
+body.light-theme .collapsible-trigger:hover {
+    background: rgba(15, 23, 42, 0.02);
+}
+
+body.light-theme .collapsible-content {
+    border-top-color: rgba(15, 23, 42, 0.08);
+}
+
+body.light-theme .file-drop-area {
+    border-color: rgba(15, 23, 42, 0.15);
+    background: rgba(15, 23, 42, 0.01);
+}
+
+body.light-theme .file-drop-area:hover,
+body.light-theme .file-drop-area.drag-over {
+    border-color: var(--color-accent-primary);
+    background: rgba(37, 99, 235, 0.03);
+}
+
+body.light-theme .csv-loaded-card {
+    background: rgba(5, 150, 105, 0.06);
+    border-color: rgba(5, 150, 105, 0.2);
+}
+
+body.light-theme .guide-list code {
+    background: rgba(15, 23, 42, 0.06);
+    border-color: rgba(15, 23, 42, 0.08);
+    color: #1d4ed8;
+}
+
+/* HTML Chart.js Tooltip */
+body.light-theme #chartjs-html-tooltip {
+    background: rgba(255, 255, 255, 0.98) !important;
+    border-color: rgba(15, 23, 42, 0.12) !important;
+    color: #0f172a !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Quick Theme Button Hover Animation */
+#btn-toggle-theme-home:hover i,
+#btn-toggle-theme:hover i,
+#btn-toggle-theme-aggregate:hover i {
+    transform: rotate(20deg) scale(1.1);
+    transition: transform 0.2s ease;
+}
+
 

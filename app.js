@@ -1246,6 +1246,87 @@ document.addEventListener('DOMContentLoaded', () => {
         btnTogglePrivacyAggregate.addEventListener('click', togglePrivacyMode);
     }
 
+    // --------------------------------------------------------------------------
+    // THEME MANAGEMENT (DARK / LIGHT)
+    // --------------------------------------------------------------------------
+    let currentTheme = localStorage.getItem('finboard_theme') || 'dark';
+
+    function updateThemeUI() {
+        const isLight = currentTheme === 'light';
+        const iconHome = document.getElementById('theme-icon-home');
+        const iconDash = document.getElementById('theme-icon');
+        const iconAgg = document.getElementById('theme-icon-aggregate');
+        const btnHome = document.getElementById('btn-toggle-theme-home');
+        const btnDash = document.getElementById('btn-toggle-theme');
+        const btnAgg = document.getElementById('btn-toggle-theme-aggregate');
+
+        const titleText = isLight ? 'Passa al tema scuro' : 'Passa al tema chiaro';
+        const iconName = isLight ? 'moon' : 'sun';
+
+        [btnHome, btnDash, btnAgg].forEach(btn => {
+            if (btn) btn.setAttribute('title', titleText);
+        });
+
+        [iconHome, iconDash, iconAgg].forEach(icon => {
+            if (icon) icon.setAttribute('data-lucide', iconName);
+        });
+
+        if (window.lucide && typeof lucide.createIcons === 'function') {
+            lucide.createIcons();
+        }
+    }
+
+    function refreshChartsOnThemeChange() {
+        const selectorScreen = document.getElementById('portfolio-selector-screen');
+        const aggregateScreen = document.getElementById('aggregate-view-screen');
+        
+        if (aggregateScreen && aggregateScreen.classList.contains('active')) {
+            if (cachedAggregateData) {
+                renderAggregateView(cachedAggregateData);
+            }
+        } else if (!selectorScreen || !selectorScreen.classList.contains('active')) {
+            // Main dashboard is active
+            updateQuickStatsAndPie();
+            renderEquityPieChart();
+            renderNetWorthChart();
+        }
+    }
+
+    function applyTheme(theme, refreshCharts = true) {
+        currentTheme = theme;
+        localStorage.setItem('finboard_theme', theme);
+        if (theme === 'light') {
+            document.body.classList.remove('dark-theme');
+            document.body.classList.add('light-theme');
+        } else {
+            document.body.classList.remove('light-theme');
+            document.body.classList.add('dark-theme');
+        }
+        updateThemeUI();
+        if (refreshCharts) {
+            refreshChartsOnThemeChange();
+        }
+    }
+
+    function toggleTheme() {
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        applyTheme(newTheme, true);
+    }
+
+    const btnToggleThemeHome = document.getElementById('btn-toggle-theme-home');
+    const btnToggleTheme = document.getElementById('btn-toggle-theme');
+    const btnToggleThemeAggregate = document.getElementById('btn-toggle-theme-aggregate');
+
+    if (btnToggleThemeHome) {
+        btnToggleThemeHome.addEventListener('click', toggleTheme);
+    }
+    if (btnToggleTheme) {
+        btnToggleTheme.addEventListener('click', toggleTheme);
+    }
+    if (btnToggleThemeAggregate) {
+        btnToggleThemeAggregate.addEventListener('click', toggleTheme);
+    }
+
     btnRefreshPrices.addEventListener('click', async () => {
         refreshIcon.classList.add('spinning');
         await loadAllPortfolios(); // Reload metadata from folders
@@ -2698,27 +2779,29 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!tooltipEl) {
                 tooltipEl = document.createElement('div');
                 tooltipEl.id = 'chartjs-html-tooltip';
-                tooltipEl.style.cssText = `
-                    background: rgba(30, 41, 59, 0.95);
-                    backdrop-filter: blur(8px);
-                    -webkit-backdrop-filter: blur(8px);
-                    border: 1px solid rgba(255, 255, 255, 0.12);
-                    border-radius: 8px;
-                    color: #e2e8f0;
-                    opacity: 0;
-                    pointer-events: none;
-                    position: absolute;
-                    transform: translate(-50%, -100%);
-                    transition: opacity 0.15s ease, transform 0.15s ease;
-                    padding: 8px 12px;
-                    z-index: 9999;
-                    font-family: var(--font-sans), sans-serif;
-                    font-size: 0.8rem;
-                    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-                    white-space: nowrap;
-                `;
                 document.body.appendChild(tooltipEl);
             }
+
+            const isLight = document.body.classList.contains('light-theme');
+            tooltipEl.style.cssText = `
+                background: ${isLight ? 'rgba(255, 255, 255, 0.98)' : 'rgba(30, 41, 59, 0.95)'};
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+                border: 1px solid ${isLight ? 'rgba(15, 23, 42, 0.12)' : 'rgba(255, 255, 255, 0.12)'};
+                border-radius: 8px;
+                color: ${isLight ? '#0f172a' : '#e2e8f0'};
+                opacity: 0;
+                pointer-events: none;
+                position: absolute;
+                transform: translate(-50%, -100%);
+                transition: opacity 0.15s ease, transform 0.15s ease;
+                padding: 8px 12px;
+                z-index: 9999;
+                font-family: var(--font-sans), sans-serif;
+                font-size: 0.8rem;
+                box-shadow: ${isLight ? '0 10px 25px -5px rgba(0, 0, 0, 0.12)' : '0 10px 25px -5px rgba(0, 0, 0, 0.5)'};
+                white-space: nowrap;
+            `;
 
             // Hide if no tooltip
             const tooltipModel = context.tooltip;
@@ -2734,7 +2817,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 let innerHtml = '';
                 titleLines.forEach(title => {
-                    innerHtml += `<div style="font-weight: 700; color: #ffffff; margin-bottom: 4px;">${title}</div>`;
+                    innerHtml += `<div style="font-weight: 700; color: ${isLight ? '#0f172a' : '#ffffff'}; margin-bottom: 4px;">${title}</div>`;
                 });
                 bodyLines.forEach((body, i) => {
                     const colors = tooltipModel.labelColors[i];
@@ -2784,8 +2867,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     labels: ['Nessun dato'],
                     datasets: [{
                         data: [1],
-                        backgroundColor: ['rgba(255, 255, 255, 0.05)'],
-                        borderColor: ['rgba(255, 255, 255, 0.1)'],
+                        backgroundColor: [document.body.classList.contains('light-theme') ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.05)'],
+                        borderColor: [document.body.classList.contains('light-theme') ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.1)'],
                         borderWidth: 1
                     }]
                 },
@@ -2837,7 +2920,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{
                     data: dataValues,
                     backgroundColor: colors,
-                    borderColor: 'rgba(30, 41, 59, 0.8)',
+                    borderColor: document.body.classList.contains('light-theme') ? '#ffffff' : 'rgba(30, 41, 59, 0.8)',
                     borderWidth: 2,
                     hoverOffset: 4
                 }]
@@ -3019,8 +3102,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     labels: ['Nessun dato'],
                     datasets: [{
                         data: [1],
-                        backgroundColor: ['rgba(255, 255, 255, 0.05)'],
-                        borderColor: ['rgba(255, 255, 255, 0.1)'],
+                        backgroundColor: [document.body.classList.contains('light-theme') ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.05)'],
+                        borderColor: [document.body.classList.contains('light-theme') ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.1)'],
                         borderWidth: 1
                     }]
                 },
@@ -3060,7 +3143,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{
                     data: dataValues,
                     backgroundColor: colors,
-                    borderColor: 'rgba(30, 41, 59, 0.8)',
+                    borderColor: document.body.classList.contains('light-theme') ? '#ffffff' : 'rgba(30, 41, 59, 0.8)',
                     borderWidth: 2,
                     hoverOffset: 4
                 }]
@@ -3206,8 +3289,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     labels: ['Nessun dato'],
                     datasets: [{
                         data: [1],
-                        backgroundColor: ['rgba(255, 255, 255, 0.05)'],
-                        borderColor: ['rgba(255, 255, 255, 0.1)'],
+                        backgroundColor: [document.body.classList.contains('light-theme') ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.05)'],
+                        borderColor: [document.body.classList.contains('light-theme') ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.1)'],
                         borderWidth: 1
                     }]
                 },
@@ -3237,7 +3320,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 datasets: [{
                     data: dataValues,
                     backgroundColor: colors,
-                    borderColor: 'rgba(30, 41, 59, 0.8)',
+                    borderColor: document.body.classList.contains('light-theme') ? '#ffffff' : 'rgba(30, 41, 59, 0.8)',
                     borderWidth: 2,
                     hoverOffset: 6
                 }]
@@ -4130,7 +4213,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     },
                     scales: {
                         y: { display: false },
-                        x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(255,255,255,0.2)' } }
+                        x: {
+                            grid: { color: document.body.classList.contains('light-theme') ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.03)' },
+                            ticks: { color: document.body.classList.contains('light-theme') ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.2)' }
+                        }
                     }
                 }
             });
@@ -4183,6 +4269,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        const isLight = document.body.classList.contains('light-theme');
         const strokeColor = '#10b981';
         const fillGradient = ctx.createLinearGradient(0, 0, 0, 350);
         fillGradient.addColorStop(0, 'rgba(16, 185, 129, 0.24)');
@@ -4216,10 +4303,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: '#1e293b',
-                        titleColor: '#ffffff',
-                        bodyColor: '#e2e8f0',
-                        borderColor: 'rgba(255,255,255,0.1)',
+                        backgroundColor: isLight ? '#ffffff' : '#1e293b',
+                        titleColor: isLight ? '#0f172a' : '#ffffff',
+                        bodyColor: isLight ? '#334155' : '#e2e8f0',
+                        borderColor: isLight ? 'rgba(15, 23, 42, 0.12)' : 'rgba(255,255,255,0.1)',
                         borderWidth: 1,
                         padding: 10,
                         cornerRadius: 8,
@@ -4236,9 +4323,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 scales: {
                     y: {
-                        grid: { color: 'rgba(255,255,255,0.04)' },
+                        grid: { color: isLight ? 'rgba(15, 23, 42, 0.05)' : 'rgba(255,255,255,0.04)' },
                         ticks: {
-                            color: '#9ca3af',
+                            color: isLight ? '#64748b' : '#9ca3af',
                             font: { family: 'Inter', size: 9 },
                             callback: function(val) {
                                 return '€ ' + formatMoney(val);
@@ -4248,25 +4335,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     x: {
                         grid: {
                             color: function(context) {
-                                if (!context.tick) return 'rgba(255,255,255,0.0)';
+                                if (!context.tick) return 'rgba(0,0,0,0.0)';
                                 const tickVal = context.tick.value;
-                                if (!visibleIndices.has(tickVal)) return 'rgba(255,255,255,0.0)';
+                                if (!visibleIndices.has(tickVal)) return 'rgba(0,0,0,0.0)';
                                 
                                 const label = labels[tickVal];
-                                if (!label) return 'rgba(255,255,255,0.0)';
+                                if (!label) return 'rgba(0,0,0,0.0)';
                                 
                                 const parts = label.split('/');
                                 if (parts.length === 3) {
-                                    if (tickVal === 0) return 'rgba(255, 255, 255, 0.35)';
+                                    if (tickVal === 0) return isLight ? 'rgba(15, 23, 42, 0.22)' : 'rgba(255, 255, 255, 0.35)';
                                     const prevLabel = labels[tickVal - 1];
                                     if (prevLabel) {
                                         const prevParts = prevLabel.split('/');
                                         if (prevParts.length === 3 && prevParts[2] !== parts[2]) {
-                                            return 'rgba(255, 255, 255, 0.35)';
+                                            return isLight ? 'rgba(15, 23, 42, 0.22)' : 'rgba(255, 255, 255, 0.35)';
                                         }
                                     }
                                 }
-                                return 'rgba(255, 255, 255, 0.05)';
+                                return isLight ? 'rgba(15, 23, 42, 0.04)' : 'rgba(255, 255, 255, 0.05)';
                             },
                             lineWidth: function(context) {
                                 if (!context.tick) return 1;
@@ -4293,7 +4380,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             drawTicks: true
                         },
                         ticks: {
-                            color: '#9ca3af',
+                            color: isLight ? '#64748b' : '#9ca3af',
                             font: { family: 'Inter', size: 9 },
                             maxRotation: 0,
                             autoSkip: false,
@@ -4740,6 +4827,8 @@ document.addEventListener('DOMContentLoaded', () => {
         fillGradient.addColorStop(0, isUp ? 'rgba(16,185,129,0.18)' : 'rgba(239,68,68,0.18)');
         fillGradient.addColorStop(1, isUp ? 'rgba(16,185,129,0)' : 'rgba(239,68,68,0)');
 
+        const isSparkLight = document.body.classList.contains('light-theme');
+
         sparklineChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
@@ -4762,7 +4851,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: '#1e293b',
+                        backgroundColor: isSparkLight ? '#ffffff' : '#1e293b',
+                        titleColor: isSparkLight ? '#0f172a' : '#ffffff',
+                        bodyColor: isSparkLight ? '#334155' : '#e2e8f0',
+                        borderColor: isSparkLight ? 'rgba(15, 23, 42, 0.12)' : 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 1,
                         padding: 10,
                         cornerRadius: 6,
                         displayColors: false
@@ -4770,12 +4863,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 scales: {
                     y: {
-                        grid: { color: 'rgba(255,255,255,0.02)' },
-                        ticks: { color: '#6b7280', font: { family: 'Inter', size: 9 } }
+                        grid: { color: isSparkLight ? 'rgba(15, 23, 42, 0.04)' : 'rgba(255,255,255,0.02)' },
+                        ticks: { color: isSparkLight ? '#64748b' : '#6b7280', font: { family: 'Inter', size: 9 } }
                     },
                     x: {
                         grid: { display: false },
-                        ticks: { color: '#6b7280', font: { family: 'Inter', size: 9 } }
+                        ticks: { color: isSparkLight ? '#64748b' : '#6b7280', font: { family: 'Inter', size: 9 } }
                     }
                 }
             }
@@ -5493,6 +5586,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Startup check
     async function startApp() {
+        applyTheme(currentTheme, false);
         await checkServerStatus();
         await loadGlobalTypologies();
         await loadAllPortfolios();
