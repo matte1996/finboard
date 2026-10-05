@@ -1,0 +1,30 @@
+﻿{
+  "Mixed (60/40)": {
+    "type": "mixed",
+    "allocation": {
+      "Stocks": 60,
+      "Bond": 40
+    }
+  },
+  "Mixed (80/20)": {
+    "type": "mixed",
+    "allocation": {
+      "Stocks": 80,
+      "Bond": 20
+    }
+  },
+  "Mixed 36/64": {
+    "type": "mixed",
+    "allocation": {
+      "Stocks": 36,
+      "Bond": 64
+    }
+  },
+  "Mixed 12/88": {
+    "type": "mixed",
+    "allocation": {
+      "Stocks": 12,
+      "Bond": 88
+    }
+  }
+}

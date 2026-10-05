@@ -1,0 +1,112 @@
+{
+  "FONTE-DINAMICO": {
+    "id": "FONTE-DINAMICO",
+    "symbol": "FONTE-DINAMICO",
+    "isin": "",
+    "name": "Fondo Fonte Comparto Dinamico",
+    "exchange": "Fondo Pensione",
+    "currency": "EUR",
+    "aliases": [
+      "FONTE-DINAMICO",
+      "FONTE.DINAMICO",
+      "FONTE DINAMICO"
+    ],
+    "searchKeywords": [
+      "FONTE",
+      "DINAMICO"
+    ],
+    "scraper": "fondofonte_html",
+    "url": "https://www.fondofonte.it/gestione-finanziaria/i-valori-quota-dei-comparti/comparto-dinamico/",
+    "method": "GET",
+    "fallbackPrice": 25.0,
+    "lastKnownPrice": 26.907,
+    "defaultAssetType": "Mixed (60/40)",
+    "description": "Fondo pensione negoziale commercio, turismo e servizi - Comparto Dinamico"
+  },
+  "AMUNDI-ESPANSIONE": {
+    "id": "AMUNDI-ESPANSIONE",
+    "symbol": "AMUNDI-ESPANSIONE",
+    "isin": "QS0000003561",
+    "name": "Amundi Secondapensione Espansione ESG",
+    "exchange": "Amundi SGR",
+    "currency": "EUR",
+    "aliases": [
+      "AMUNDI-ESPANSIONE",
+      "QS0000003561",
+      "AMUNDI ESPANSIONE",
+      "AMUNDI_ESPANSIONE"
+    ],
+    "searchKeywords": [
+      "AMUNDI",
+      "SECONDA",
+      "ESPANSIONE",
+      "QS0000003561"
+    ],
+    "scraper": "secondapensione_json",
+    "url": "https://www.secondapensione.it/product-services/fdr/share/v3/full/QS0000003561",
+    "method": "POST",
+    "body": "{\"fields\":[\"isin\",\"currency\",\"lastNav\",\"navHistory\"]}",
+    "fallbackPrice": 21.0,
+    "lastKnownPrice": 21.836,
+    "defaultAssetType": "Mixed (80/20)",
+    "description": "Fondo pensione aperto Amundi Secondapensione comparto Espansione ESG"
+  },
+  "4PAPRST": {
+    "id": "AXA-STABILITA",
+    "symbol": "4PAPRST",
+    "isin": "4PAPRST",
+    "name": "Axa Mps Previdenza Per Te Linea Stabilita'",
+    "exchange": "Borsa Italiana",
+    "currency": "EUR",
+    "aliases": [
+      "4PAPRST",
+      "AXA-STABILITA",
+      "AXA STABILITA",
+      "AXA_STABILITA",
+      "AXA-MPS-STABILITA",
+      "AXA PREVIDENZA"
+    ],
+    "searchKeywords": [
+      "AXA",
+      "STABILITA",
+      "4PAPRST",
+      "PREVIDENZA"
+    ],
+    "scraper": "borsa_italiana_fondi",
+    "url": "https://www.borsaitaliana.it/borsa/fondi/dettaglio/4PAPRST.html",
+    "method": "GET",
+    "fallbackPrice": 24.411,
+    "lastKnownPrice": 24.411,
+    "defaultAssetType": "Mixed (30/70)",
+    "description": "Fondo pensione aperto Axa MPS Previdenza Per Te - Linea Stabilità"
+  },
+  "GENGRRB": {
+    "id": "GENERALI-REAL-RETURN",
+    "symbol": "GENGRRB",
+    "isin": "",
+    "name": "Generali Global Real Return B",
+    "exchange": "Teleborsa",
+    "currency": "EUR",
+    "aliases": [
+      "GENGRRB",
+      "GENERALI-REAL-RETURN",
+      "GENERALI REAL RETURN",
+      "GENERALI-GLOBAL-REAL-RETURN",
+      "GENERALI GLOBAL REAL RETURN",
+      "FC.GENGRRB"
+    ],
+    "searchKeywords": [
+      "GENERALI",
+      "GENGRRB",
+      "REAL RETURN",
+      "GLOBAL REAL RETURN"
+    ],
+    "scraper": "teleborsa_fondi",
+    "url": "https://www.teleborsa.it/fondi/generali-global-real-return-b-gengrrb-RkMuR0VOR1JSQg/grafico",
+    "method": "GET",
+    "fallbackPrice": 11.205,
+    "lastKnownPrice": 11.205,
+    "defaultAssetType": "Mixed",
+    "description": "Fondo comune / pensione Generali Global Real Return B (scraping Teleborsa)"
+  }
+}

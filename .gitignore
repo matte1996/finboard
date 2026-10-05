@@ -1,0 +1,30 @@
+# ==============================================================================
+# FINBOARD - .gitignore
+# ==============================================================================
+
+# Esclusione dati personali dei portafogli (sicurezza e privacy finanziaria)
+# Tutte le cartelle dei portafogli all'interno di input/ vengono ignorate
+input/*
+!input/.gitkeep
+!input/Portafoglio Demo/
+!input/Portafoglio Demo/**
+
+# Cartelle temporanee e di sviluppo locale
+scratch/
+.system_generated/
+*.log
+
+# File di sistema e configurazioni OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor e IDE
+.vscode/
+.idea/
+*.swp
+*.swo

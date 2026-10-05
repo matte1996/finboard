@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finboard - Dashboard Finanziaria</title>
+    <!-- Google Fonts: Inter & Montserrat for numbers/headings -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js and PapaParse via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <!-- Lucide Icons UMD Build -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Stylesheet link -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+    
+    <!-- Background elements for blur and gradient effects -->
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+    <div class="bg-glow bg-glow-3"></div>
+
+    <div class="app-container">
+        
+        <!-- ==================== PORTFOLIO SELECTOR STATE ==================== -->
+        <div id="portfolio-selector-screen" class="screen-view active">
+            <div class="welcome-box">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 680px; margin: 0 auto 20px auto; padding: 0 16px;">
+                    <div class="logo" style="margin-bottom: 0;">
+                        <i data-lucide="trending-up" class="logo-icon"></i>
+                        <span>finboard</span>
+                    </div>
+                    <button id="btn-toggle-privacy-home" class="btn btn-secondary btn-icon-only" title="Nascondi/Mostra Valori" style="border-radius: 50%; width: 40px; height: 40px;">
+                        <i data-lucide="eye" id="privacy-icon-home"></i>
+                    </button>
+                </div>
+                <h1>Benvenuto su Finboard</h1>
+                <p class="subtitle">Gestisci, analizza e traccia i tuoi portafogli finanziari in tempo reale.</p>
+                
+                <div class="portfolios-section">
+                    <h3>I tuoi Portafogli</h3>
+                    <div id="portfolio-list" class="portfolio-grid">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+
+                <div class="new-portfolio-trigger-box" style="display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                    <button id="btn-show-add-portfolio" class="btn btn-primary">
+                        <i data-lucide="plus"></i> Nuovo Portafoglio
+                    </button>
+                    <button id="btn-open-aggregate-view" class="btn btn-secondary" disabled title="Seleziona almeno 2 portafogli per abilitare la vista aggregata">
+                        <i data-lucide="layers"></i> <span id="btn-aggregate-text">Vista Aggregata</span>
+                    </button>
+                    <button id="btn-open-typology-manager" class="btn btn-secondary" title="Censisci e gestisci le tipologie di asset per tutti i portafogli">
+                        <i data-lucide="sliders-horizontal"></i> Censimento Tipologie Miste
+                    </button>
+                </div>
+
+                <div class="folder-sync-status-box card mt-6 text-left" style="max-width: 500px; margin: 24px auto 0 auto; background: rgba(255, 255, 255, 0.01); border-color: rgba(255,255,255,0.05);">
+                    <div class="flex-between">
+                        <h4 style="font-family: var(--font-heading); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-secondary); margin: 0;">Sincronizzazione File System</h4>
+                        <span id="folder-status-badge" class="badge badge-danger">Scollegato</span>
+                    </div>
+                    <p class="text-xs text-muted mt-2" style="line-height: 1.4;">
+                        Collega la cartella principale di <strong>finboard</strong> per creare fisicamente le sottocartelle dei portafogli nella cartella <strong>input</strong> e leggere automaticamente il file <strong>patrimonio.csv</strong> dal tuo hard disk.
+                    </p>
+                    <div class="mt-3 text-right">
+                        <button id="btn-connect-folder-selector" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem; gap: 6px;">
+                            <i data-lucide="folder-open" style="width: 14px; height: 14px;"></i> Collega Cartella
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Add Portfolio Modal-like card -->
+            <div id="add-portfolio-card" class="card modal-style hidden">
+                <div class="card-header">
+                    <h2>Crea Nuovo Portafoglio</h2>
+                    <button id="btn-close-add-portfolio" class="btn-icon-close">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+                <form id="form-new-portfolio" class="form-grid">
+                    <div class="form-group">
+                        <label for="portfolio-name">Nome Portafoglio</label>
+                        <input type="text" id="portfolio-name" required placeholder="Es. Portafoglio Growth, ETF Lungo Termine...">
+                    </div>
+                    <div class="form-group">
+                        <label for="portfolio-cash">Liquidità Iniziale (€)</label>
+                        <input type="number" id="portfolio-cash" step="0.01" min="0" value="0.00" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="portfolio-desc">Descrizione (Opzionale)</label>
+                        <textarea id="portfolio-desc" placeholder="Inserisci una breve descrizione per questo portafoglio..."></textarea>
+                    </div>
+                    <div class="form-actions full-width">
+                        <button type="button" id="btn-cancel-add-portfolio" class="btn btn-secondary">Annulla</button>
+                        <button type="submit" class="btn btn-primary">Crea Portafoglio</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- TYPOLOGY MANAGEMENT MODAL -->
+            <div id="typology-management-modal" class="modal-backdrop hidden">
+                <div class="modal-card" style="max-width: 580px; max-height: 90vh; overflow-y: auto;">
+                    <div class="modal-header">
+                        <div>
+                            <h3 style="margin: 0;">Censimento e Gestione Tipologie</h3>
+                            <p class="text-xs text-muted" style="margin: 4px 0 0 0;">Definisci tipologie miste (Stocks / Bond) operative su tutti i portafogli e nei grafici.</p>
+                        </div>
+                        <button id="btn-close-typology-manager" class="btn-icon-close">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body" style="display: flex; flex-direction: column; gap: 20px;">
+                        <!-- FORM NUOVO CENSIMENTO -->
+                        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 16px;">
+                            <h4 style="font-size: 0.95rem; font-family: var(--font-heading); font-weight: 600; color: var(--color-text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                                <i data-lucide="plus-circle" style="width: 16px; height: 16px; color: var(--color-accent-primary);"></i> Censisci Nuova Tipologia
+                            </h4>
+                            <form id="form-mgr-add-typology" style="display: flex; flex-direction: column; gap: 14px;">
+                                <div class="form-group">
+                                    <label for="typology-mgr-name">Nome Tipologia</label>
+                                    <input type="text" id="typology-mgr-name" required placeholder="Es. Mixed 70/30, LifeStrategy 60, Bilanciato 50/50...">
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                    <div class="form-group">
+                                        <label for="typology-mgr-stocks" style="display: flex; align-items: center; gap: 6px;">
+                                            <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block;"></span>
+                                            Quota Stocks (%)
+                                        </label>
+                                        <input type="number" id="typology-mgr-stocks" min="0" max="100" step="1" value="60" required style="text-align: right;">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="typology-mgr-bond" style="display: flex; align-items: center; gap: 6px;">
+                                            <span style="width: 8px; height: 8px; border-radius: 50%; background: #3b82f6; display: inline-block;"></span>
+                                            Quota Bond (%)
+                                        </label>
+                                        <input type="number" id="typology-mgr-bond" min="0" max="100" step="1" value="40" required style="text-align: right;">
+                                    </div>
+                                </div>
+
+                                <!-- Anteprima Barra Ripartizione -->
+                                <div>
+                                    <div class="flex-between" style="font-size: 0.75rem;">
+                                        <span class="text-muted">Ripartizione Percentuale</span>
+                                        <span id="typology-mgr-sum-label" class="font-semibold text-success">Totale: 100%</span>
+                                    </div>
+                                    <div class="typology-split-preview">
+                                        <div id="typology-preview-stocks" class="split-stocks" style="width: 60%;"></div>
+                                        <div id="typology-preview-bond" class="split-bond" style="width: 40%;"></div>
+                                    </div>
+                                </div>
+
+                                <div class="text-right" style="margin-top: 4px;">
+                                    <button type="submit" id="btn-save-mgr-typology" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.85rem;">
+                                        <i data-lucide="check" style="width: 14px; height: 14px;"></i> Salva Tipologia
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- LISTA TIPOLOGIE ATTUALMENTE DISPONIBILI -->
+                        <div>
+                            <div class="flex-between" style="margin-bottom: 8px;">
+                                <h4 style="font-size: 0.9rem; font-family: var(--font-heading); font-weight: 600; color: var(--color-text-primary);">
+                                    Tipologie Censite nei Portafogli
+                                </h4>
+                                <span id="typology-mgr-count" class="badge">2 attive</span>
+                            </div>
+                            <p class="text-xs text-muted" style="margin-bottom: 12px;">Queste tipologie sono utilizzabili in ogni portafoglio e vengono considerate automaticamente per grafici e asset allocation.</p>
+                            
+                            <div id="typology-mgr-list" style="display: flex; flex-direction: column; gap: 8px;">
+                                <!-- Elenco generato dinamicamente -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="btn-close-typology-manager-footer" class="btn btn-secondary">Chiudi</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== MAIN DASHBOARD STATE ==================== -->
+        <div id="main-dashboard-screen" class="screen-view hidden">
+            
+            <!-- TOP NAVIGATION & STATUS -->
+            <header class="app-header">
+                <div class="header-left">
+                    <div class="logo logo-mini" id="btn-go-home" title="Torna alla selezione portafogli">
+                        <i data-lucide="trending-up" class="logo-icon"></i>
+                        <span>finboard</span>
+                    </div>
+                    <span class="divider">/</span>
+                    <div class="portfolio-dropdown-container">
+                        <button id="active-portfolio-name-btn" class="active-portfolio-btn">
+                            <span id="active-portfolio-name-text">Portafoglio</span>
+                            <i data-lucide="chevron-down" class="chevron"></i>
+                        </button>
+                        <div id="portfolio-dropdown-list" class="dropdown-content hidden">
+                            <!-- Loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Global Stats Panel -->
+                <div class="header-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Patrimonio Totale</span>
+                        <span class="stat-value" id="global-net-worth">€ 0.00</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Controvalore Titoli</span>
+                        <span class="stat-value" id="global-holdings-value">€ 0.00</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Liquidità</span>
+                        <span class="stat-value" id="global-cash" title="Clicca per modificare la liquidità" style="cursor: pointer; border-bottom: 1px dashed rgba(255, 255, 255, 0.3); padding-bottom: 1px;">€ 0.00</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Rendimento Totale</span>
+                        <span class="stat-value badge" id="global-total-profit">€ 0.00 (0.00%)</span>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <button id="btn-connect-folder-header" class="btn btn-secondary btn-icon-only" title="Connessione Cartella Progetto">
+                        <i data-lucide="folder-off" id="folder-header-icon" class="text-danger"></i>
+                    </button>
+                    <button id="btn-toggle-privacy" class="btn btn-secondary btn-icon-only" title="Nascondi/Mostra Valori">
+                        <i data-lucide="eye" id="privacy-icon"></i>
+                    </button>
+                    <button id="btn-refresh-prices" class="btn btn-secondary btn-icon-only" title="Aggiorna Prezzi">
+                        <i data-lucide="refresh-cw" id="refresh-icon"></i>
+                    </button>
+                    <button id="btn-exit-portfolio" class="btn btn-secondary" title="Chiudi portafoglio">
+                        <i data-lucide="log-out"></i> Esci
+                    </button>
+                </div>
+            </header>
+
+            <!-- EDIT CASH MODAL -->
+            <div id="edit-cash-modal" class="modal-backdrop hidden">
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <h3>Gestisci Liquidità</h3>
+                        <button id="btn-close-cash-modal" class="btn-icon-close"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Inserisci il nuovo saldo di liquidità per il portafoglio. Questo valore verrà sommato al valore dei titoli per determinare il patrimonio complessivo.</p>
+                        <div class="form-group">
+                            <label for="input-edit-cash">Nuovo Saldo (€)</label>
+                            <input type="number" id="input-edit-cash" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="btn-cancel-cash-modal" class="btn btn-secondary">Annulla</button>
+                        <button id="btn-save-cash-modal" class="btn btn-primary">Salva</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADD SHARES MODAL -->
+            <div id="add-shares-modal" class="modal-backdrop hidden">
+                <div class="modal-card" style="max-width: 460px;">
+                    <div class="modal-header">
+                        <h3>Aggiungi Quote</h3>
+                        <button id="btn-close-add-shares-modal" class="btn-icon-close"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <p style="margin-bottom: 16px; font-size: 0.9rem; color: var(--color-text-secondary);">
+                            Aggiunta quote per <strong id="add-shares-ticker-display" style="color: var(--color-text-primary);"></strong>
+                        </p>
+                        <!-- Current position info badge -->
+                        <div id="add-shares-current-info" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; display: flex; gap: 24px;">
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <span style="font-size: 0.72rem; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Quote attuali</span>
+                                <span id="add-shares-current-qty" style="font-size: 1rem; font-weight: 700; color: var(--color-text-primary);">—</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <span style="font-size: 0.72rem; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">PMC attuale</span>
+                                <span id="add-shares-current-pmc" style="font-size: 1rem; font-weight: 700; color: var(--color-text-primary);">—</span>
+                            </div>
+                        </div>
+                        <form id="form-add-shares" class="form-grid">
+                            <div class="form-group" style="grid-column: span 1;">
+                                <label for="input-add-shares-qty">Quote da aggiungere</label>
+                                <input type="number" id="input-add-shares-qty" step="1" min="0.0001" required placeholder="0">
+                            </div>
+                            <div class="form-group" style="grid-column: span 1;">
+                                <label for="input-add-shares-pmc">P.M.C. acquisto (€)</label>
+                                <input type="number" id="input-add-shares-pmc" step="0.0001" min="0.0001" required placeholder="0.00">
+                            </div>
+                        </form>
+                        <!-- Preview of new totals -->
+                        <div id="add-shares-preview" class="hidden" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 12px 16px; margin-top: 16px; display: flex; gap: 24px;">
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <span style="font-size: 0.72rem; color: #10b981; text-transform: uppercase; letter-spacing: 0.05em;">Nuove quote totali</span>
+                                <span id="add-shares-preview-qty" style="font-size: 1rem; font-weight: 700; color: var(--color-text-primary);">—</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <span style="font-size: 0.72rem; color: #10b981; text-transform: uppercase; letter-spacing: 0.05em;">Nuovo PMC</span>
+                                <span id="add-shares-preview-pmc" style="font-size: 1rem; font-weight: 700; color: var(--color-text-primary);">—</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="btn-cancel-add-shares-modal" class="btn btn-secondary">Annulla</button>
+                        <button id="btn-confirm-add-shares-modal" class="btn btn-primary">
+                            <i data-lucide="plus-circle" style="width: 16px; height: 16px;"></i> Conferma Acquisto
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SELL SHARES MODAL -->
+            <div id="sell-shares-modal" class="modal-backdrop hidden">
+                <div class="modal-card" style="max-width: 460px;">
+                    <div class="modal-header">
+                        <h3>Vendi Quote</h3>
+                        <button id="btn-close-sell-shares-modal" class="btn-icon-close"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <p style="margin-bottom: 16px; font-size: 0.9rem; color: var(--color-text-secondary);">
+                            Vendita quote per <strong id="sell-shares-ticker-display" style="color: var(--color-text-primary);"></strong>
+                        </p>
+                        <!-- Current position info badge -->
+                        <div id="sell-shares-current-info" style="background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; display: flex; gap: 24px;">
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <span style="font-size: 0.72rem; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Quote attuali</span>
+                                <span id="sell-shares-current-qty" style="font-size: 1rem; font-weight: 700; color: var(--color-text-primary);">—</span>
+                            </div>
+                            <div style="display: flex; flex-direction: column; gap: 2px;">
+                                <span style="font-size: 0.72rem; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">PMC attuale</span>
+                                <span id="sell-shares-current-pmc" style="font-size: 1rem; font-weight: 700; color: var(--color-text-primary);">—</span>
+                            </div>
+                        </div>
+                        <form id="form-sell-shares" class="form-grid" onsubmit="return false;">
+                            <div class="form-group" style="grid-column: span 2;">
+                                <label for="input-sell-shares-qty">Quote da vendere</label>
+                                <input type="number" id="input-sell-shares-qty" step="0.0001" min="0.0001" required placeholder="0">
+                            </div>
+                        </form>
+                        <!-- Preview of new totals -->
+                        <div id="sell-shares-preview" class="hidden" style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 10px; padding: 12px 16px; margin-top: 16px; display: flex; flex-direction: column; gap: 8px;">
+                            <div style="display: flex; gap: 24px;">
+                                <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span style="font-size: 0.72rem; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.05em;">Quote rimanenti</span>
+                                    <span id="sell-shares-preview-qty" style="font-size: 1rem; font-weight: 700; color: var(--color-text-primary);">—</span>
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 2px;">
+                                    <span style="font-size: 0.72rem; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.05em;">PMC (invariato)</span>
+                                    <span id="sell-shares-preview-pmc" style="font-size: 1rem; font-weight: 700; color: var(--color-text-primary);">—</span>
+                                </div>
+                            </div>
+                            <div id="sell-shares-preview-msg" style="font-size: 0.8rem; color: #ef4444; font-weight: 500;" class="hidden"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="btn-cancel-sell-shares-modal" class="btn btn-secondary">Annulla</button>
+                        <button id="btn-confirm-sell-shares-modal" class="btn btn-primary" style="background-color: var(--color-accent-warning); border-color: var(--color-accent-warning);">
+                            <i data-lucide="minus-circle" style="width: 16px; height: 16px;"></i> Conferma Vendita
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EDIT HOLDING MODAL -->
+            <div id="edit-holding-modal" class="modal-backdrop hidden">
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <h3>Modifica Posizione</h3>
+                        <button id="btn-close-holding-modal" class="btn-icon-close"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <p id="edit-holding-subtitle">Modifica la quantità e il prezzo medio di carico per il titolo <strong id="edit-holding-ticker-display"></strong>.</p>
+                        <form id="form-edit-holding" class="form-grid">
+                            <div class="form-group" id="edit-holding-shares-group" style="grid-column: span 1;">
+                                <label for="input-edit-holding-shares" id="lbl-edit-holding-shares">Numero Quote</label>
+                                <input type="number" id="input-edit-holding-shares" step="1" min="0" required placeholder="0">
+                            </div>
+                            <div class="form-group" id="edit-holding-price-group" style="grid-column: span 1;">
+                                <label for="input-edit-holding-price" id="lbl-edit-holding-price">P.M.C. (€)</label>
+                                <input type="number" id="input-edit-holding-price" step="0.0001" min="0.0001" required placeholder="0.00">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="btn-cancel-holding-modal" class="btn btn-secondary">Annulla</button>
+                        <button id="btn-save-holding-modal" class="btn btn-primary">Salva Modifiche</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EDIT DEPOSIT MODAL -->
+            <div id="edit-deposit-modal" class="modal-backdrop hidden">
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <h3>Modifica Operazione</h3>
+                        <button id="btn-close-deposit-modal" class="btn-icon-close"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="input-edit-deposit-index">
+                        <div class="form-group mb-4" style="margin-bottom: 16px;">
+                            <label for="input-edit-deposit-date">Data Operazione</label>
+                            <input type="date" id="input-edit-deposit-date" required style="width: 100%;">
+                        </div>
+                        <div class="form-group mb-4" style="margin-bottom: 16px;">
+                            <label for="input-edit-deposit-amount">Importo (€)</label>
+                            <input type="number" id="input-edit-deposit-amount" step="0.01" required placeholder="0.00" style="width: 100%;">
+                        </div>
+                        <div class="form-group mb-4" style="margin-bottom: 16px;">
+                            <label for="input-edit-deposit-desc">Descrizione</label>
+                            <select id="input-edit-deposit-desc" style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.5); border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-text-primary);">
+                                <option value="Conferimento con bonifico">Conferimento con bonifico</option>
+                                <option value="Prelievo bonifico">Prelievo bonifico</option>
+                                <option value="Conferimento titoli">Conferimento titoli</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="btn-cancel-deposit-modal" class="btn btn-secondary">Annulla</button>
+                        <button id="btn-save-deposit-modal" class="btn btn-primary">Salva Modifiche</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADD TYPOLOGY MODAL -->
+            <div id="add-typology-modal" class="modal-backdrop hidden">
+                <div class="modal-card" style="max-width: 550px;">
+                    <div class="modal-header">
+                        <h3>Crea Nuova Tipologia Prodotto</h3>
+                        <button id="btn-close-typology-modal" class="btn-icon-close"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="form-add-typology" style="display: flex; flex-direction: column; gap: 16px;">
+                            <div class="form-group">
+                                <label for="typology-name">Nome Tipologia</label>
+                                <input type="text" id="typology-name" required placeholder="Es. Real Estate, Mixed (70/30), Fondi Esteri...">
+                            </div>
+                            <div class="form-group">
+                                <label for="typology-mode">Tipo Allocazione</label>
+                                <select id="typology-mode" required>
+                                    <option value="single">Singola (Nuova classe di attivo a sé stante)</option>
+                                    <option value="mixed">Mista (Composta da percentuali di altre tipologie)</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Section for mixed allocation components -->
+                            <div id="typology-mixed-section" class="hidden" style="background: rgba(255,255,255,0.02); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+                                <h4 style="font-size: 0.9rem; font-family: var(--font-heading); font-weight: 600; color: var(--color-text-primary);">Ripartizione Percentuale</h4>
+                                <p class="text-xs text-muted" style="margin-bottom: 8px;">Definisci i componenti di questa tipologia mista. La somma delle percentuali deve essere esattamente 100%.</p>
+                                
+                                <div id="typology-components-container" style="display: flex; flex-direction: column; gap: 8px;">
+                                    <!-- Dynamic rows will be inserted here -->
+                                </div>
+                                
+                                <div class="flex-between" style="margin-top: 8px;">
+                                    <button type="button" id="btn-add-typology-component" class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem; gap: 6px;">
+                                        <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Aggiungi Componente
+                                    </button>
+                                    <span id="typology-allocation-total" class="font-semibold text-sm text-danger">Totale: 0%</span>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="btn-cancel-typology-modal" class="btn btn-secondary">Annulla</button>
+                        <button id="btn-save-typology-modal" class="btn btn-primary" disabled>Salva Tipologia</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW NAV TABS -->
+            <nav class="dashboard-tabs">
+                <button class="tab-btn active" data-target="tab-performance">
+                    <i data-lucide="pie-chart"></i> Andamento Real Time
+                </button>
+                <button class="tab-btn" data-target="tab-deposits">
+                    <i data-lucide="wallet"></i> Riepilogo Versamenti
+                </button>
+                <button class="tab-btn" data-target="tab-patrimonio">
+                    <i data-lucide="line-chart"></i> Patrimonio (Evoluzione)
+                </button>
+                <button class="tab-btn" data-target="tab-search">
+                    <i data-lucide="search"></i> Cerca Titolo
+                </button>
+            </nav>
+
+            <!-- TAB CONTENT VIEWS -->
+            <main class="tab-content-container">
+                
+                <!-- ==================== TAB 1: PERFORMANCE ==================== -->
+                <div id="tab-performance" class="tab-panel active">
+                    <div class="panel-layout-grid">
+                        
+                        <!-- Main Portfolio Table (Full Width) -->
+                        <div class="card col-span-4">
+                            <div class="card-header flex-between flex-wrap" style="gap: 16px;">
+                                <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                                    <h2>Titoli in Portafoglio</h2>
+                                    <div id="market-indicators" style="display: flex; align-items: center; gap: 12px; font-size: 0.76rem; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 4px 12px; flex-wrap: wrap;">
+                                        <div style="color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px;">
+                                            <span style="font-weight: 600; color: #f59e0b;">BTC:</span>
+                                            <span id="val-btc" style="color: #ffffff; font-weight: 600; letter-spacing: 0.3px;">$ 67,540.00</span>
+                                        </div>
+                                        <span style="color: rgba(255,255,255,0.12)">|</span>
+                                        <div style="color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px;">
+                                            <span style="font-weight: 600; color: #10b981;">S&P 500:</span>
+                                            <span id="val-sp500" style="color: #ffffff; font-weight: 600; letter-spacing: 0.3px;">5,280.00 pt</span>
+                                        </div>
+                                        <span style="color: rgba(255,255,255,0.12)">|</span>
+                                        <div style="color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px;">
+                                            <span style="font-weight: 600; color: #ec4899;">Russell 2000:</span>
+                                            <span id="val-russell" style="color: #ffffff; font-weight: 600; letter-spacing: 0.3px;">2,050.00 pt</span>
+                                        </div>
+                                        <span style="color: rgba(255,255,255,0.12)">|</span>
+                                        <div style="color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px;">
+                                            <span style="font-weight: 600; color: #3b82f6;">EUR/USD:</span>
+                                            <span id="val-eurusd" style="color: #ffffff; font-weight: 600; letter-spacing: 0.3px;">1.0850</span>
+                                        </div>
+                                        <span style="color: rgba(255,255,255,0.12)">|</span>
+                                        <div style="color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px;">
+                                            <span style="font-weight: 600; color: #14b8a6;">BTP 10Y:</span>
+                                            <span id="val-btp10y" style="color: #ffffff; font-weight: 600; letter-spacing: 0.3px;">3.85%</span>
+                                        </div>
+                                        <span style="color: rgba(255,255,255,0.12)">|</span>
+                                        <div style="color: var(--color-text-secondary); display: flex; align-items: center; gap: 4px;">
+                                            <span style="font-weight: 600; color: #f97316;">US 10Y:</span>
+                                            <span id="val-us10y" style="color: #ffffff; font-weight: 600; letter-spacing: 0.3px;">4.45%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-actions">
+                                    <span class="text-muted text-sm font-medium" id="holdings-count">0 Titoli</span>
+                                </div>
+                            </div>
+                            
+                            <div class="table-container">
+                                <table class="holdings-table" id="holdings-table">
+                                    <thead>
+                                        <tr>
+                                            <th data-sort="ticker">Titolo</th>
+                                            <th data-sort="exchange">Mercato</th>
+                                            <th data-sort="shares" class="text-right">Quote</th>
+                                            <th data-sort="buyPrice" class="text-right">Prezzo Carico</th>
+                                            <th data-sort="buyCost" class="text-right">Valore Carico</th>
+                                            <th data-sort="currentPrice" class="text-right">Prezzo Attuale</th>
+                                            <th data-sort="currentValue" class="text-right">Valore Attuale</th>
+                                            <th data-sort="pnl" class="text-right">Guadagno/Perdita</th>
+                                            <th data-sort="type" class="text-center">Tipologia</th>
+                                            <th class="text-center">Azioni</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="holdings-table-body">
+                                        <!-- Loaded dynamically -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div id="holdings-empty-state" class="empty-state">
+                                <i data-lucide="folder-open" class="empty-icon"></i>
+                                <h3>Nessun titolo inserito</h3>
+                                <p>Aggiungi il tuo primo titolo usando il modulo sottostante o cercandolo nella sezione Ricerca.</p>
+                            </div>
+                        </div>
+
+                        <!-- Add Asset Card (Full Width) -->
+                        <div class="card col-span-4">
+                            <div class="card-header">
+                                <h2>Aggiungi Titolo</h2>
+                            </div>
+                            <div class="card-body add-asset-grid">
+                                <form id="form-add-asset" class="asset-form" style="width: 100%;">
+                                    <div class="form-group">
+                                        <label for="asset-ticker">Ticker Yahoo Finance / Nome</label>
+                                        <div class="input-with-info">
+                                            <input type="text" id="asset-ticker" required placeholder="Es. AAPL, ISP.MI, URTH.MI, CASH, BOND">
+                                            <span class="input-tip">Usa il suffisso per mercati europei, es: <strong>.MI</strong>. Per liquidità usa <strong>CASH</strong>. Per BOT / obbligazioni generiche usa <strong>BOND</strong>.</span>
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label for="asset-shares">Numero Quote</label>
+                                            <input type="number" id="asset-shares" step="any" min="0.00001" required placeholder="0.00">
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="asset-buy-price">P.M.C. (€)</label>
+                                            <input type="number" id="asset-buy-price" step="0.0001" min="0.0001" required placeholder="0.00">
+                                        </div>
+                                    </div>
+                                    <div class="form-group" style="margin-top: 12px; margin-bottom: 12px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                            <label for="asset-type" style="margin-bottom: 0;">Tipologia Prodotto</label>
+                                            <button type="button" id="btn-add-typology-trigger" class="btn-link" style="font-size: 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 4px; padding: 0;">
+                                                <i data-lucide="plus" style="width: 14px; height: 14px;"></i>Tipologia
+                                            </button>
+                                        </div>
+                                        <select id="asset-type" required>
+                                            <option value="Stocks" selected>Stocks</option>
+                                            <option value="Bond">Bond</option>
+                                            <option value="Hard assets">Hard assets</option>
+                                            <option value="CASH">CASH</option>
+                                            <option value="Crypto">Crypto</option>
+                                            <option value="Mixed (60/40)">Mixed (60/40)</option>
+                                            <option value="Mixed (80/20)">Mixed (80/20)</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-actions">
+                                        <button type="submit" class="btn btn-primary full-width">
+                                            <i data-lucide="plus-circle"></i> Aggiungi Posizione
+                                        </button>
+                                    </div>
+                                </form>
+                                
+                                <div class="info-alert" style="margin-top: 0; height: 100%; display: flex; flex-direction: column; justify-content: center;">
+                                    <i data-lucide="info" class="alert-icon"></i>
+                                    <div class="alert-content">
+                                        <h4>Regola Borse Aperte:</h4>
+                                        <p>Se le borse europee sono aperte (Lun-Ven 9:00 - 17:30 CET), l'app cerca i prezzi sui listini europei (es. Milano, Francoforte). Altrimenti, cerca sui listini americani convertendo i prezzi da USD a EUR.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Portfolio Allocation Card (Full Width with Side-by-Side Charts) -->
+                        <div class="card col-span-4" id="portfolio-allocation-card">
+                            <div class="card-header">
+                                <h2>Ripartizione Portafoglio</h2>
+                                <p class="card-subtitle">Analisi dettagliata dell'Asset Allocation globale e dei singoli prodotti Azionari.</p>
+                            </div>
+                            <div class="card-body allocation-grid">
+                                
+                                <!-- Left Column: Global Asset Allocation -->
+                                <div class="allocation-section with-border" style="border-right: 1px solid rgba(255, 255, 255, 0.08); padding-right: 24px;">
+                                    <div style="position: relative; width: 140px; height: 140px; display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
+                                        <canvas id="allocation-pie-chart"></canvas>
+                                        <div id="pie-empty-state" class="text-muted text-sm hidden" style="position: absolute; text-align: center;">Nessun titolo</div>
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1; width: 100%;">
+                                        <h4 style="margin: 0 0 8px 0; font-size: 0.9rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Asset Allocation</h4>
+                                        <div id="pie-legend-container" style="display: flex; flex-direction: column; gap: 6px; width: 100%;">
+                                            <!-- Populated dynamically -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Right Column: Equity Allocation -->
+                                <div class="allocation-section" style="padding-left: 8px;">
+                                    <div style="position: relative; width: 140px; height: 140px; display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
+                                        <canvas id="equity-pie-chart"></canvas>
+                                        <div id="equity-pie-empty-state" class="text-muted text-sm hidden" style="position: absolute; text-align: center; font-size: 0.85rem;">Nessuna azione</div>
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1; width: 100%;">
+                                        <h4 style="margin: 0 0 8px 0; font-size: 0.9rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Ripartizione Azionaria</h4>
+                                        <div id="equity-pie-legend-container" style="display: flex; flex-direction: column; gap: 6px; width: 100%;">
+                                            <!-- Populated dynamically -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ==================== TAB: DEPOSITS ==================== -->
+                <div id="tab-deposits" class="tab-panel">
+                    <div class="panel-layout-grid">
+                        
+                        <!-- Left Panel: Add Deposit Form -->
+                        <div class="card col-span-1">
+                            <div class="card-header">
+                                <h2>Nuovo Versamento</h2>
+                                <p class="card-subtitle">Registra un nuovo versamento o prelievo.</p>
+                            </div>
+                            <div class="card-body">
+                                <form id="form-add-deposit" style="display: flex; flex-direction: column; gap: 16px;">
+                                    <div class="form-group">
+                                        <label for="input-deposit-date">Data Operazione</label>
+                                        <input type="date" id="input-deposit-date" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="input-deposit-amount">Importo (€)</label>
+                                        <input type="number" id="input-deposit-amount" step="0.01" required placeholder="0.00">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="input-deposit-desc">Descrizione</label>
+                                        <select id="input-deposit-desc" style="width: 100%; padding: 10px; background: rgba(30, 41, 59, 0.5); border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-text-primary);">
+                                            <option value="Conferimento con bonifico">Conferimento con bonifico</option>
+                                            <option value="Prelievo bonifico">Prelievo bonifico</option>
+                                            <option value="Conferimento titoli">Conferimento titoli</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" id="btn-save-deposit" class="btn btn-primary mt-2">
+                                        <i data-lucide="plus"></i> Aggiungi Operazione
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Deposits Grid -->
+                        <div class="card col-span-3">
+                            <div class="card-header flex-between flex-wrap" style="gap: 16px;">
+                                <div>
+                                    <h2>Storico Versamenti</h2>
+                                    <p class="card-subtitle">Elenco di tutti i conferimenti e prelievi eseguiti.</p>
+                                </div>
+                                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                                    <button id="btn-sync-patrimonio-deposits" type="button" class="btn btn-secondary btn-tiny" style="padding: 6px 12px; font-size: 0.75rem; display: flex; align-items: center; gap: 6px;">
+                                        <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                                        Recupera da patrimonio
+                                    </button>
+                                    <div id="deposits-total-badge" class="badge badge-accent" style="font-size: 0.8rem; padding: 6px 12px;">
+                                        Totale Versato: € 0.00
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-container">
+                                    <table class="holdings-table" id="deposits-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Data</th>
+                                                <th>Descrizione</th>
+                                                <th class="text-right">Importo</th>
+                                                <th class="text-center" style="width: 80px;">Azioni</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="deposits-table-body">
+                                            <!-- Loaded dynamically -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <!-- Pagination Controls -->
+                                <div class="flex-between mt-4" id="deposits-pagination-controls" style="align-items: center; justify-content: space-between; display: flex;">
+                                    <span class="text-xs text-muted" id="deposits-page-info">Pagina 1 di 1</span>
+                                    <div style="display: flex; gap: 8px;">
+                                        <button id="btn-deposits-prev" type="button" class="btn btn-secondary btn-tiny" style="padding: 4px 10px;">Precedente</button>
+                                        <button id="btn-deposits-next" type="button" class="btn btn-secondary btn-tiny" style="padding: 4px 10px;">Successiva</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ==================== TAB 2: PATRIMONIO ==================== -->
+                <div id="tab-patrimonio" class="tab-panel">
+                    <div class="panel-layout-grid-2">
+                        
+                        <!-- Net Worth Chart Card -->
+                        <div class="card col-span-4">
+                            <div class="card-header flex-between">
+                                <div>
+                                    <h2>Evoluzione del Patrimonio</h2>
+                                    <p class="card-subtitle">Evoluzione storica del tuo patrimonio aggiornata giorno per giorno.</p>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 16px;">
+                                    <div class="chart-stats" id="chart-stats-summary">
+                                        <!-- Populated dynamically -->
+                                    </div>
+                                    <button id="btn-chart-fullscreen" class="btn btn-secondary btn-icon-only" title="Schermo Intero" style="padding: 8px;">
+                                        <i data-lucide="maximize" style="width: 16px; height: 16px;"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Date Range & Preset Controls -->
+                            <div class="chart-controls">
+                                <div class="time-presets">
+                                    <button id="btn-period-ytd" class="btn btn-secondary btn-tiny">YTD</button>
+                                    <button id="btn-period-1y" class="btn btn-secondary btn-tiny">1 Anno</button>
+                                    <button id="btn-period-max" class="btn btn-primary btn-tiny">MAX</button>
+                                </div>
+                                <div class="date-inputs">
+                                    <label for="input-date-start">Da:</label>
+                                    <input type="date" id="input-date-start">
+                                    <label for="input-date-end">A:</label>
+                                    <input type="date" id="input-date-end">
+                                </div>
+                            </div>
+                            
+                            <div class="chart-container">
+                                <canvas id="net-worth-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Import Broker CSV Card (Collapsible) -->
+                        <div class="card col-span-4 collapsible-card" id="csv-import-card">
+                            <button class="collapsible-trigger" id="btn-toggle-csv-card">
+                                <span class="trigger-title">
+                                    <i data-lucide="upload-cloud"></i> Importa Dati Broker (CSV)
+                                </span>
+                                <span class="trigger-chevron">
+                                    <i data-lucide="chevron-down" id="csv-card-chevron"></i>
+                                </span>
+                            </button>
+                            <div class="collapsible-content hidden" id="csv-card-content">
+                                <p class="text-muted text-sm mb-4">
+                                    Carica un file CSV esportato dal tuo broker o crea un file con le colonne: 
+                                    <strong>Date</strong> (Formato: YYYY-MM-DD o DD/MM/YYYY) e 
+                                    <strong>Value</strong> (o Patrimonio, Net Worth).
+                                </p>
+                                
+                                <div class="file-drop-area" id="csv-drop-zone">
+                                    <i data-lucide="upload-cloud" class="upload-icon"></i>
+                                    <span class="file-message">Trascina qui il file CSV o clicca per sfogliare</span>
+                                    <input type="file" id="csv-file-input" accept=".csv" class="file-input">
+                                </div>
+
+                                <div class="csv-buttons-container mt-4">
+                                    <button id="btn-demo-csv" class="btn btn-secondary full-width">
+                                        <i data-lucide="wand-2"></i> Genera Dati Demo
+                                    </button>
+                                    <a id="btn-download-template" class="btn btn-link mt-2 text-center block" href="#">
+                                        <i data-lucide="download" class="text-xs"></i> Scarica Template CSV
+                                    </a>
+                                </div>
+                                
+                                <!-- Loaded data stats -->
+                                <div id="csv-loaded-info" class="csv-loaded-card hidden mt-4">
+                                    <div class="success-header">
+                                        <i data-lucide="check-circle" class="text-success"></i>
+                                        <h4>CSV Caricato con Successo</h4>
+                                    </div>
+                                    <div class="csv-meta-details mt-2">
+                                        <p>Punti analizzati: <strong id="csv-point-count">0</strong></p>
+                                        <p>Periodo: <strong id="csv-date-range">N/D</strong></p>
+                                        <button id="btn-clear-csv" class="btn btn-danger-link mt-3">
+                                            <i data-lucide="trash-2"></i> Rimuovi Dati Storici
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ==================== TAB 3: STOCK SEARCH ==================== -->
+                <div id="tab-search" class="tab-panel">
+                    <div class="panel-layout-grid-3">
+                        
+                        <!-- Search Form Card -->
+                        <div class="card col-span-2">
+                            <div class="card-header">
+                                <h2>Ricerca Quotazioni Real-Time</h2>
+                                <p class="card-subtitle">Cerca aziende, ETF o indici globali per visualizzare prezzi dettagliati e grafici storici.</p>
+                            </div>
+                            
+                            <div class="search-form-wrapper">
+                                <div class="search-bar-container">
+                                    <i data-lucide="search" class="search-bar-icon"></i>
+                                    <input type="text" id="input-stock-search" placeholder="Cerca ticker o nome azienda... (es. Apple, Tesla, ISP.MI, URTH.MI, CSPX.MI)">
+                                    <button id="btn-clear-search" class="btn-clear hidden"><i data-lucide="x"></i></button>
+                                </div>
+                                
+                                <div id="search-autocomplete-list" class="search-autocomplete-box hidden">
+                                    <!-- Populated dynamically -->
+                                </div>
+                            </div>
+
+                            <!-- Search Result Detailed View -->
+                            <div id="search-result-detail" class="stock-detail-card hidden mt-6">
+                                <div class="stock-detail-header">
+                                    <div class="stock-title-info">
+                                        <h2 id="search-detail-name">Apple Inc.</h2>
+                                        <div class="stock-tags">
+                                            <span class="badge badge-accent" id="search-detail-symbol">AAPL</span>
+                                            <span class="badge" id="search-detail-exchange">NASDAQ</span>
+                                            <span class="badge" id="search-detail-currency">USD</span>
+                                        </div>
+                                    </div>
+                                    <div class="stock-price-info text-right">
+                                        <div class="price-value" id="search-detail-price">$ 180.50</div>
+                                        <div class="price-change font-semibold" id="search-detail-change">+1.25%</div>
+                                    </div>
+                                </div>
+
+                                <hr class="divider-hr">
+
+                                <div class="detail-grid">
+                                    <div class="detail-item">
+                                        <span class="detail-label">Massimo Giornaliero</span>
+                                        <span class="detail-val" id="search-detail-high">-</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Minimo Giornaliero</span>
+                                        <span class="detail-val" id="search-detail-low">-</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Apertura</span>
+                                        <span class="detail-val" id="search-detail-open">-</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="detail-label">Chiusura Prec.</span>
+                                        <span class="detail-val" id="search-detail-prev-close">-</span>
+                                    </div>
+                                </div>
+
+                                <div class="detail-chart-wrapper mt-4">
+                                    <h4>Andamento 30 Giorni</h4>
+                                    <div class="sparkline-chart-container">
+                                        <canvas id="search-sparkline-chart"></canvas>
+                                    </div>
+                                </div>
+
+                                <div class="detail-action-bar mt-6">
+                                    <button id="btn-add-search-to-portfolio" class="btn btn-primary">
+                                        <i data-lucide="plus-circle"></i> Aggiungi al Portafoglio Attivo
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div id="search-initial-state" class="empty-state">
+                                <i data-lucide="search" class="empty-icon"></i>
+                                <h3>Cerca un titolo</h3>
+                                <p>Digita una parola chiave o il codice ticker per visualizzare i dettagli di mercato in tempo reale.</p>
+                            </div>
+                        </div>
+
+                        <!-- Guide Card -->
+                        <div class="card col-span-1">
+                            <div class="card-header">
+                                <h2>Guida ai Simboli Yahoo</h2>
+                            </div>
+                            <div class="guide-box">
+                                <p class="text-sm mb-4">Finboard si collega ai dati di mercato globali tramite Yahoo Finance. Ecco come trovare i simboli giusti:</p>
+                                
+                                <ul class="guide-list text-sm">
+                                    <li>
+                                        <strong>Azioni / ETF Italiani (Borsa Italiana)</strong>
+                                        <p class="text-muted">Aggiungi il suffisso <code>.MI</code><br>Es: <code>ISP.MI</code> (Intesa Sanpaolo), <code>ENI.MI</code> (Eni), <code>CSSX.MI</code> (ETF S&P 500)</p>
+                                    </li>
+                                    <li>
+                                        <strong>Azioni Tedesche (Xetra / Francoforte)</strong>
+                                        <p class="text-muted">Aggiungi il suffisso <code>.DE</code> o <code>.F</code><br>Es: <code>SAP.DE</code>, <code>BMW.DE</code>, <code>APC.F</code> (Apple su Francoforte)</p>
+                                    </li>
+                                    <li>
+                                        <strong>Azioni Americane (NASDAQ / NYSE)</strong>
+                                        <p class="text-muted">Usa il ticker originale senza suffissi<br>Es: <code>AAPL</code> (Apple), <code>TSLA</code> (Tesla), <code>MSFT</code> (Microsoft)</p>
+                                    </li>
+                                    <li>
+                                        <strong>Cambi Valutari (Forex)</strong>
+                                        <p class="text-muted">Es: <code>EURUSD=X</code> (Tasso di cambio Euro/Dollaro)</p>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+
+        <!-- ==================== AGGREGATE VIEW STATE ==================== -->
+        <div id="aggregate-view-screen" class="screen-view hidden">
+            
+            <!-- TOP NAVIGATION & STATUS -->
+            <header class="app-header">
+                <div class="header-left">
+                    <div class="logo logo-mini" id="btn-aggregate-home" title="Torna alla selezione portafogli">
+                        <i data-lucide="trending-up" class="logo-icon"></i>
+                        <span>finboard</span>
+                    </div>
+                    <span class="divider">/</span>
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <span style="font-family: var(--font-heading); font-size: 1.1rem; font-weight: 700; color: var(--color-text-primary);">Vista Aggregata</span>
+                        <div id="aggregate-portfolios-badges" class="aggregate-badges-container">
+                            <!-- Populated dynamically with chips of selected portfolios -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Global Stats Panel -->
+                <div class="header-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Patrimonio Totale</span>
+                        <span class="stat-value" id="aggregate-net-worth">€ 0.00</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Controvalore Titoli</span>
+                        <span class="stat-value" id="aggregate-holdings-value">€ 0.00</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Liquidità Totale</span>
+                        <span class="stat-value" id="aggregate-cash">€ 0.00</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Rendimento Totale</span>
+                        <span class="stat-value badge" id="aggregate-total-profit">€ 0.00 (0.00%)</span>
+                    </div>
+                </div>
+
+                <div class="header-right">
+                    <button id="btn-toggle-privacy-aggregate" class="btn btn-secondary btn-icon-only" title="Nascondi/Mostra Valori">
+                        <i data-lucide="eye" id="privacy-icon-aggregate"></i>
+                    </button>
+                    <button id="btn-refresh-aggregate" class="btn btn-secondary btn-icon-only" title="Aggiorna Prezzi in Tempo Reale">
+                        <i data-lucide="refresh-cw" id="refresh-icon-aggregate"></i>
+                    </button>
+                    <button id="btn-exit-aggregate" class="btn btn-secondary" title="Torna alla Home">
+                        <i data-lucide="arrow-left"></i> Torna alla Home
+                    </button>
+                </div>
+            </header>
+
+            <main class="main-content">
+                <!-- Loading State -->
+                <div id="aggregate-loading" class="card text-center py-6 hidden" style="padding: 40px; margin-bottom: 24px;">
+                    <i data-lucide="loader-2" class="spinning" style="width: 32px; height: 32px; color: var(--color-accent-primary); margin-bottom: 12px; display: inline-block;"></i>
+                    <h4 style="font-size: 1.1rem; color: var(--color-text-primary); margin-bottom: 6px;">Aggiornamento e Consolidamento in corso...</h4>
+                    <p class="text-sm text-muted">Recupero delle quotazioni in tempo reale per tutti i titoli dei portafogli selezionati.</p>
+                </div>
+
+                <!-- Aggregate Main Content -->
+                <div id="aggregate-content">
+                    <div id="aggregate-main-card" class="card">
+                        <div class="card-header flex-between" style="border-bottom: 1px solid var(--color-border); padding-bottom: 16px;">
+                            <div>
+                                <h3 style="font-size: 1.2rem; font-family: var(--font-heading); margin-bottom: 4px;">Ripartizione per Asset Class</h3>
+                                <p class="text-xs text-muted" style="margin: 0;">Asset allocation aggregata combinata di tutti i portafogli selezionati.</p>
+                            </div>
+                            <div id="aggregate-total-assets-count" class="badge badge-accent" style="font-size: 0.75rem;">
+                                0 Titoli aggregati
+                            </div>
+                        </div>
+
+                        <div class="card-body">
+                            <div class="aggregate-grid">
+                                <!-- Left: Pie / Doughnut Chart -->
+                                <div class="aggregate-pie-container">
+                                    <div class="aggregate-chart-wrapper">
+                                        <canvas id="aggregate-allocation-pie-chart"></canvas>
+                                        <div id="aggregate-pie-empty" class="text-muted text-sm hidden" style="position: absolute; text-align: center;">Nessun dato</div>
+                                    </div>
+                                    <div class="text-xs text-muted mt-3" style="text-align: center;">
+                                        Include titoli e liquidità complessiva
+                                    </div>
+                                </div>
+
+                                <!-- Right: Legend / Totals Table -->
+                                <div class="aggregate-legend-container">
+                                    <h4 style="font-size: 0.85rem; font-weight: 600; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 8px 0;">
+                                        Totali per Asset Class
+                                    </h4>
+                                    <table class="aggregate-legend-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Asset Class</th>
+                                                <th class="text-right">Valore (€)</th>
+                                                <th class="text-right">Peso (%)</th>
+                                                <th class="text-right">P&L Totale</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="aggregate-pie-legend-body">
+                                            <!-- Dynamically generated -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Individual Portfolios Breakdown Card -->
+                    <div class="aggregate-portfolios-card">
+                        <div class="card-header" style="border-bottom: 1px solid var(--color-border); padding-bottom: 12px;">
+                            <h4 style="font-size: 1rem; font-family: var(--font-heading); margin: 0 0 4px 0;">Contributo dei Singoli Portafogli</h4>
+                            <p class="text-xs text-muted" style="margin: 0;">Peso e controvalore di ciascun portafoglio rispetto al patrimonio aggregato totale.</p>
+                        </div>
+                        <div id="aggregate-portfolios-distribution" class="aggregate-portfolios-list">
+                            <!-- Dynamically generated items -->
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Main JavaScript App File -->
+    <script src="app.js"></script>
+</body>
+</html>
