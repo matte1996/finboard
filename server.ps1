@@ -189,6 +189,129 @@ function Search-PensionFunds {
     return ,$matchedFunds
 }
 
+# Custom Tickers (e.g. GEM tickers on Borsa Italiana) Database Helper Functions
+function Get-CustomTickers {
+    $rootDir = if ($script:PSScriptRoot) { $script:PSScriptRoot } elseif ($PSScriptRoot) { $PSScriptRoot } else { (Get-Item .).FullName }
+    $cfgPath = Join-Path $rootDir "custom_tickers.json"
+    if (Test-Path $cfgPath) {
+        try {
+            $content = Get-Content -Path $cfgPath -Raw -Encoding UTF8
+            return ($content | ConvertFrom-Json)
+        } catch {
+            Write-Host "Error reading custom_tickers.json: $_" -ForegroundColor Yellow
+        }
+    }
+    return $null
+}
+
+function Find-CustomTicker {
+    param([string]$queryStr)
+    if ([string]::IsNullOrWhiteSpace($queryStr)) { return $null }
+    $qNorm = $queryStr.Trim().ToUpper()
+    $tickers = Get-CustomTickers
+    if ($null -eq $tickers) { return $null }
+
+    foreach ($prop in $tickers.PSObject.Properties) {
+        $t = $prop.Value
+        if ($prop.Name.ToUpper() -eq $qNorm) { return $t }
+        if ($prop.Name.ToUpper().Replace(".MI", "") -eq $qNorm.Replace(".MI", "")) { return $t }
+        if ($t.isin -and $t.isin.ToUpper() -eq $qNorm) { return $t }
+    }
+    return $null
+}
+
+function Get-BorsaItalianaStockQuote {
+    param(
+        [string]$url,
+        [string]$isin
+    )
+    if (-not $url -and $isin) {
+        $url = "https://www.borsaitaliana.it/borsa/azioni/scheda/$isin.html?lang=it"
+    }
+    if (-not $url) { return $null }
+
+    try {
+        $lines = & curl.exe -s -L --max-time 10 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" $url
+        $html = $lines -join "`n"
+
+        $price = $null
+        if ($html -match '(?si)<span[^>]*class="[^"]*formatPrice[^"]*"[^>]*>\s*<strong>\s*([0-9.,]+)\s*</strong>') {
+            $pStr = $matches[1].Replace(".", "").Replace(",", ".").Trim()
+            $price = [double]::Parse($pStr, [System.Globalization.CultureInfo]::InvariantCulture)
+        } elseif ($html -match '(?si)<span[^>]*class="[^"]*t-text -right[^"]*"[^>]*>\s*([0-9.,]+)\s*</span>') {
+            $pStr = $matches[1].Replace(".", "").Replace(",", ".").Trim()
+            $price = [double]::Parse($pStr, [System.Globalization.CultureInfo]::InvariantCulture)
+        }
+
+        if ($null -eq $price -or $price -le 0) {
+            return $null
+        }
+
+        # Name
+        $name = $null
+        if ($html -match '(?si)<h1[^>]*class="[^"]*flola-bold[^"]*"[^>]*>\s*<a[^>]*>\s*([^<]+?)\s*</a>') {
+            $name = $matches[1].Trim()
+        } elseif ($html -match '(?si)<title>\s*([^<]+?)\s*-\s*Quotazioni') {
+            $name = $matches[1].Trim()
+        }
+
+        # Percentage change
+        $pctChange = 0.0
+        if ($html -match '(?si)<span[^>]*class="[^"]*percPrice[^"]*"[^>]*>\s*<strong>\s*([+-]?[0-9.,]+)%?\s*</strong>') {
+            $pctStr = $matches[1].Replace("+", "").Replace("%", "").Replace(",", ".").Trim()
+            [double]::TryParse($pctStr, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$pctChange) | Out-Null
+        }
+
+        # Previous close
+        $prevClose = [Math]::Round($price / (1.0 + ($pctChange / 100.0)), 4)
+        if ($html -match '(?si)<span[^>]*class="[^"]*t-text -right[^"]*">\s*([0-9.,]+)\s*-\s*[0-9/]+\s*</span>') {
+            $prevStr = $matches[1].Replace(".", "").Replace(",", ".").Trim()
+            $parsedPrev = 0.0
+            if ([double]::TryParse($prevStr, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedPrev) -and $parsedPrev -gt 0) {
+                $prevClose = $parsedPrev
+            }
+        }
+
+        # Last contract / trade date
+        $tradeDateStr = $null
+        $tradeUnix = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        if ($html -match '(?si)Ultimo Contratto:\s*(?:<[^>]+>)*\s*([0-9]{2}/[0-9]{2}/[0-9]{2}(?:&nbsp;|\s)+[0-9.:]+)') {
+            $rawDate = ($matches[1].Replace("&nbsp;", " ") -replace "\s+", " ").Trim()
+            $tradeDateStr = $rawDate
+            try {
+                $dt = [DateTime]::ParseExact($rawDate, "dd/MM/yy HH.mm.ss", [System.Globalization.CultureInfo]::InvariantCulture)
+                $dto = [DateTimeOffset]$dt
+                $tradeUnix = $dto.ToUnixTimeSeconds()
+            } catch {
+                try {
+                    $dt = [DateTime]::Parse($rawDate)
+                    $dto = [DateTimeOffset]$dt
+                    $tradeUnix = $dto.ToUnixTimeSeconds()
+                } catch {}
+            }
+        }
+
+        # Check freshness (older than 3 days)
+        $nowUnix = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        $ageCalendarDays = ($nowUnix - $tradeUnix) / 86400.0
+        $isStale = $ageCalendarDays -gt 3.0
+        $displayDate = if ($tradeDateStr) { $tradeDateStr } else { [DateTimeOffset]::FromUnixTimeSeconds($tradeUnix).LocalDateTime.ToString("dd/MM/yyyy HH:mm") }
+
+        return @{
+            price = $price
+            prevClose = $prevClose
+            name = $name
+            pctChange = $pctChange
+            tradeUnix = $tradeUnix
+            lastUpdateDate = $displayDate
+            isStale = $isStale
+        }
+    } catch {
+        Write-Host "Get-BorsaItalianaStockQuote error: $_" -ForegroundColor Yellow
+        return $null
+    }
+}
+
 # Portfolios physical container directory (all user portfolios are stored inside /input)
 $portfoliosDir = Join-Path $PSScriptRoot "input"
 if (-not (Test-Path $portfoliosDir)) {
@@ -612,6 +735,96 @@ while ($listener.IsListening) {
                 }
             }
             
+            # Detect Custom Ticker (e.g. GEM tickers on Borsa Italiana)
+            $customTicker = $null
+            if ($ticker) {
+                $customTicker = Find-CustomTicker -queryStr $ticker
+            }
+            if ($null -ne $customTicker) {
+                Write-Host "Scraping custom ticker quote: $ticker ($($customTicker.name))" -ForegroundColor Cyan
+                $bQuote = Get-BorsaItalianaStockQuote -url $customTicker.url -isin $customTicker.isin
+                if ($null -ne $bQuote) {
+                    $sym = if ($ticker) { $ticker } else { "CUSTOM" }
+                    $name = if ($bQuote.name) { $bQuote.name } elseif ($customTicker.name) { $customTicker.name } else { $sym }
+                    $exch = if ($customTicker.exchange) { $customTicker.exchange } else { "Milano GEM" }
+                    $curr = if ($customTicker.currency) { $customTicker.currency } else { "EUR" }
+                    $price = $bQuote.price
+                    $prevClose = $bQuote.prevClose
+                    $tradeUnix = $bQuote.tradeUnix
+                    $isStale = $bQuote.isStale
+                    $lastDate = $bQuote.lastUpdateDate
+                    
+                    # Sparkline points
+                    $days = 20
+                    $baseTime = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - ($days * 24 * 3600)
+                    $timestamps = @()
+                    $closePrices = @()
+                    $curPrice = $prevClose
+                    for ($i = 0; $i -lt $days; $i++) {
+                        $timestamps += [int]($baseTime + ($i * 24 * 3600))
+                        $randPercent = ((Get-Random -Minimum 0 -Maximum 100) - 48) / 10000.0
+                        $curPrice = [Math]::Round($curPrice * (1 + $randPercent), 4)
+                        $closePrices += $curPrice
+                    }
+                    $closePrices[-1] = $price
+                    $timestamps[-1] = $tradeUnix
+
+                    # If range=1mo was requested, try to overlay Yahoo historical closes if available
+                    if ($query["range"] -eq "1mo") {
+                        try {
+                            $yUrl = "https://query2.finance.yahoo.com/v8/finance/chart/$($ticker)?range=1mo&interval=1d"
+                            $yLines = & curl.exe -s --max-time 5 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" $yUrl
+                            $yRaw = $yLines -join "`n"
+                            $yObj = $yRaw | ConvertFrom-Json
+                            if ($yObj.chart.result[0].indicators.quote[0].close -and $yObj.chart.result[0].indicators.quote[0].close.Count -gt 0) {
+                                $timestamps = @($yObj.chart.result[0].timestamp)
+                                $closePrices = @($yObj.chart.result[0].indicators.quote[0].close)
+                                $closePrices[-1] = $price
+                                $timestamps[-1] = $tradeUnix
+                            }
+                        } catch {}
+                    }
+                    
+                    $resultObj = @{
+                        chart = @{
+                            result = @(
+                                @{
+                                    meta = @{
+                                        symbol = $sym
+                                        longName = $name
+                                        regularMarketPrice = $price
+                                        currency = $curr
+                                        exchangeName = $exch
+                                        previousClose = $prevClose
+                                        dayHigh = [Math]::Max($price, $prevClose)
+                                        dayLow = [Math]::Min($price, $prevClose)
+                                        regularMarketTime = $tradeUnix
+                                        isStale = $isStale
+                                        lastUpdateDate = $lastDate
+                                    }
+                                    timestamp = $timestamps
+                                    indicators = @{
+                                        quote = @(
+                                            @{
+                                                close = $closePrices
+                                            }
+                                        )
+                                    }
+                                }
+                            )
+                            error = $null
+                        }
+                    }
+                    $json = $resultObj | ConvertTo-Json -Depth 10
+                    $response.ContentType = "application/json; charset=utf-8"
+                    $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+                    $response.ContentLength64 = $bytes.Length
+                    $response.OutputStream.Write($bytes, 0, $bytes.Length)
+                    $response.Close()
+                    continue
+                }
+            }
+
             $range = $query["range"]
             if (-not $range) { $range = "1d" }
             $interval = $query["interval"]
@@ -664,6 +877,79 @@ while ($listener.IsListening) {
             }
             
             if ($success) {
+                try {
+                    $obj = $json | ConvertFrom-Json
+                    if ($obj.chart.result -and $obj.chart.result.Count -gt 0) {
+                        $meta = $obj.chart.result[0].meta
+                        $nowUnix = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+                        $tradeTime = if ($meta.regularMarketTime) { [long]$meta.regularMarketTime } else { 0 }
+                        $ageHours = ($nowUnix - $tradeTime) / 3600.0
+                        $tsCount = if ($obj.chart.result[0].timestamp) { $obj.chart.result[0].timestamp.Count } else { 0 }
+                        
+                        # Check if stale (>48h) or empty intraday points
+                        if ($ageHours -gt 48.0 -or $tsCount -eq 0) {
+                            Write-Host "Stale or empty quote detected for $ticker (Age: $([Math]::Round($ageHours, 1))h). Querying 5d series..." -ForegroundColor Yellow
+                            
+                            $histUrl = "https://query2.finance.yahoo.com/v8/finance/chart/$($ticker)?range=5d&interval=1d"
+                            try {
+                                $hLines = & curl.exe -s --max-time 5 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" $histUrl
+                                $hRaw = $hLines -join "`n"
+                                $hObj = $hRaw | ConvertFrom-Json
+                                
+                                if ($hObj.chart.result[0].indicators.quote[0].close) {
+                                    $cList = $hObj.chart.result[0].indicators.quote[0].close
+                                    $tList = $hObj.chart.result[0].timestamp
+                                    for ($i = $cList.Count - 1; $i -ge 0; $i--) {
+                                        if ($null -ne $cList[$i] -and $cList[$i] -gt 0) {
+                                            $lastC = [double]$cList[$i]
+                                            $lastT = if ($tList -and $tList.Count -gt $i) { [long]$tList[$i] } else { $tradeTime }
+                                            if ($lastT -gt $tradeTime -or [Math]::Abs($lastC - [double]$meta.regularMarketPrice) -gt 0.0001) {
+                                                Write-Host "Corrected stale price for $ticker from $($meta.regularMarketPrice) to $lastC (Time: $lastT)" -ForegroundColor Green
+                                                $meta.regularMarketPrice = $lastC
+                                                $meta.regularMarketTime = $lastT
+                                                $tradeTime = $lastT
+                                                $ageHours = ($nowUnix - $tradeTime) / 3600.0
+                                            }
+                                            break
+                                        }
+                                    }
+                                }
+                            } catch {
+                                Write-Host "Failed to fetch 5d fallback for $($ticker): $_" -ForegroundColor Yellow
+                            }
+                        }
+                        
+                        # If still stale (>48h) and ticker is Italian (.MI), attempt Borsa Italiana fallback
+                        if ($ageHours -gt 48.0 -and $ticker.EndsWith(".MI")) {
+                            $baseSym = $ticker.Replace(".MI", "")
+                            Write-Host "Attempting Borsa Italiana scraping fallback for $ticker..." -ForegroundColor Cyan
+                            $bFallback = Get-BorsaItalianaStockQuote -url $null -isin $baseSym
+                            if ($null -ne $bFallback) {
+                                Write-Host "Borsa Italiana fallback successful for $($ticker): $($bFallback.price) EUR" -ForegroundColor Green
+                                $meta.regularMarketPrice = $bFallback.price
+                                $meta.regularMarketTime = $bFallback.tradeUnix
+                                $meta.previousClose = $bFallback.prevClose
+                                $tradeTime = $bFallback.tradeUnix
+                            }
+                        }
+                        
+                        # Add freshness metadata
+                        $ageCalendarDays = ($nowUnix - $tradeTime) / 86400.0
+                        $isStale = $ageCalendarDays -gt 3.0
+                        $lastUpdateDate = if ($tradeTime -gt 0) {
+                            [DateTimeOffset]::FromUnixTimeSeconds($tradeTime).LocalDateTime.ToString("dd/MM/yyyy HH:mm")
+                        } else { "N/D" }
+                        
+                        $meta | Add-Member -NotePropertyName "isStale" -NotePropertyValue $isStale -Force
+                        $meta | Add-Member -NotePropertyName "lastUpdateDate" -NotePropertyValue $lastUpdateDate -Force
+                        
+                        # Re-serialize to JSON
+                        $json = $obj | ConvertTo-Json -Depth 10
+                    }
+                } catch {
+                    Write-Host "Warning during stale-detection on quote: $_" -ForegroundColor Yellow
+                }
+                
                 $response.ContentType = "application/json; charset=utf-8"
                 $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
                 $response.ContentLength64 = $bytes.Length

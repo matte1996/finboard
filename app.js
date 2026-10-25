@@ -601,7 +601,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             prevClose: meta.previousClose,
                             open: meta.regularMarketPrice,
                             high: meta.dayHigh || meta.regularMarketPrice,
-                            low: meta.dayLow || meta.regularMarketPrice
+                            low: meta.dayLow || meta.regularMarketPrice,
+                            regularMarketTime: meta.regularMarketTime,
+                            isStale: !!meta.isStale,
+                            lastUpdateDate: meta.lastUpdateDate || ""
                         };
                     }
                 }
@@ -617,16 +620,46 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await fetchWithProxy(yahooUrl);
                 if (data && data.chart && data.chart.result && data.chart.result[0]) {
                     const meta = data.chart.result[0].meta;
+                    let resolvedPrice = meta.regularMarketPrice;
+                    let isStale = false;
+                    let lastUpdateDate = "";
+
+                    if (meta.regularMarketTime) {
+                        const nowSec = Math.floor(Date.now() / 1000);
+                        const ageDays = (nowSec - meta.regularMarketTime) / 86400;
+                        if (ageDays > 3) {
+                            isStale = true;
+                        }
+                        const dt = new Date(meta.regularMarketTime * 1000);
+                        lastUpdateDate = dt.toLocaleDateString('it-IT') + ' ' + dt.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+                    }
+
+                    // Series fallback if 1d points are empty or regularMarketTime is stale
+                    if (data.chart.result[0].indicators && data.chart.result[0].indicators.quote && data.chart.result[0].indicators.quote[0]) {
+                        const closes = data.chart.result[0].indicators.quote[0].close;
+                        if (closes && closes.length > 0) {
+                            for (let i = closes.length - 1; i >= 0; i--) {
+                                if (closes[i] != null && closes[i] > 0) {
+                                    resolvedPrice = closes[i];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     return {
                         symbol: meta.symbol,
                         name: meta.longName || meta.shortName || meta.symbol,
-                        price: meta.regularMarketPrice,
+                        price: resolvedPrice,
                         currency: meta.currency,
                         exchange: meta.exchangeName,
                         prevClose: meta.previousClose,
-                        open: meta.regularMarketPrice,
-                        high: meta.dayHigh || meta.regularMarketPrice,
-                        low: meta.dayLow || meta.regularMarketPrice
+                        open: resolvedPrice,
+                        high: meta.dayHigh || resolvedPrice,
+                        low: meta.dayLow || resolvedPrice,
+                        regularMarketTime: meta.regularMarketTime,
+                        isStale: isStale,
+                        lastUpdateDate: lastUpdateDate
                     };
                 }
                 throw new Error();
@@ -2239,7 +2272,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     pnlPercent: pnlPercent,
                     exchange: quote.exchange,
                     sourceMsg: sourceMsg,
-                    type: assetType
+                    type: assetType,
+                    isStale: quote.isStale,
+                    lastUpdateDate: quote.lastUpdateDate
                 };
             } catch (err) {
                 console.error(`Error resolving quote for ${targetTicker}:`, err);
@@ -2595,7 +2630,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="text-right font-medium">${displayShares}</td>
                 <td class="text-right">€ ${formatMoney(h.buyPrice)}</td>
                 <td class="text-right">€ ${formatMoney(h.buyCost)}</td>
-                <td class="text-right font-semibold">€ ${formatMoney(h.currentPrice)}</td>
+                <td class="text-right font-semibold" ${h.lastUpdateDate ? `title="Ultimo aggiornamento: ${escapeHTML(h.lastUpdateDate)}"` : ''}>
+                    € ${formatMoney(h.currentPrice)}
+                    ${h.isStale ? `
+                        <div class="mt-1" style="display: flex; justify-content: flex-end;">
+                            <span class="badge badge-warning" style="font-size: 0.65rem; padding: 1px 5px; display: inline-flex; align-items: center; gap: 4px; cursor: help;" title="Quotazione non recente (Ultima seduta: ${escapeHTML(h.lastUpdateDate || 'N/D')})">
+                                <i data-lucide="clock" style="width: 10px; height: 10px;"></i> ${escapeHTML(h.lastUpdateDate ? h.lastUpdateDate.split(' ')[0] : 'Datato')}
+                            </span>
+                        </div>
+                    ` : ''}
+                </td>
                 <td class="text-right font-semibold">€ ${formatMoney(h.currentValue)}</td>
                 <td class="text-right font-semibold ${pnlClass}">
                     ${displayPnlSign}€ ${formatMoney(h.pnl)}<br>

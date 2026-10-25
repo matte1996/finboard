@@ -834,6 +834,12 @@ textarea {
     color: var(--color-accent-danger);
 }
 
+.badge-warning {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
 /* Header right controls */
 .header-right {
     display: flex;
@@ -2244,6 +2250,12 @@ body.light-theme .badge-success {
 body.light-theme .badge-danger {
     background-color: rgba(220, 38, 38, 0.1);
     color: #b91c1c;
+}
+
+body.light-theme .badge-warning {
+    background-color: rgba(217, 119, 6, 0.12);
+    color: #b45309;
+    border: 1px solid rgba(217, 119, 6, 0.25);
 }
 
 /* Market Status Badge */

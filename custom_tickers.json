@@ -1,0 +1,74 @@
+{
+  "1BRK.MI": {
+    "name": "Berkshire Hathaway Inc. Class B",
+    "isin": "US0846707026",
+    "scraper": "borsa_italiana_gem",
+    "url": "https://www.borsaitaliana.it/borsa/azioni/global-equity-market/scheda/US0846707026-BGEM.html?lang=it",
+    "currency": "EUR",
+    "exchange": "Milano GEM"
+  },
+  "1MSFT.MI": {
+    "name": "Microsoft Corporation",
+    "isin": "US5949181045",
+    "scraper": "borsa_italiana_gem",
+    "url": "https://www.borsaitaliana.it/borsa/azioni/global-equity-market/scheda/US5949181045-BGEM.html?lang=it",
+    "currency": "EUR",
+    "exchange": "Milano GEM"
+  },
+  "1MC.MI": {
+    "name": "LVMH Moët Hennessy",
+    "isin": "FR0000121014",
+    "scraper": "borsa_italiana_gem",
+    "url": "https://www.borsaitaliana.it/borsa/azioni/global-equity-market/scheda/FR0000121014-BGEM.html?lang=it",
+    "currency": "EUR",
+    "exchange": "Milano GEM"
+  },
+  "1AAPL.MI": {
+    "name": "Apple Inc.",
+    "isin": "US0378331005",
+    "scraper": "borsa_italiana_gem",
+    "url": "https://www.borsaitaliana.it/borsa/azioni/global-equity-market/scheda/US0378331005-BGEM.html?lang=it",
+    "currency": "EUR",
+    "exchange": "Milano GEM"
+  },
+  "1AMZN.MI": {
+    "name": "Amazon.com Inc.",
+    "isin": "US0231351067",
+    "scraper": "borsa_italiana_gem",
+    "url": "https://www.borsaitaliana.it/borsa/azioni/global-equity-market/scheda/US0231351067-BGEM.html?lang=it",
+    "currency": "EUR",
+    "exchange": "Milano GEM"
+  },
+  "1NVDA.MI": {
+    "name": "NVIDIA Corporation",
+    "isin": "US67066G1040",
+    "scraper": "borsa_italiana_gem",
+    "url": "https://www.borsaitaliana.it/borsa/azioni/global-equity-market/scheda/US67066G1040-BGEM.html?lang=it",
+    "currency": "EUR",
+    "exchange": "Milano GEM"
+  },
+  "1GOOGL.MI": {
+    "name": "Alphabet Inc. Class A",
+    "isin": "US02079K3059",
+    "scraper": "borsa_italiana_gem",
+    "url": "https://www.borsaitaliana.it/borsa/azioni/global-equity-market/scheda/US02079K3059-BGEM.html?lang=it",
+    "currency": "EUR",
+    "exchange": "Milano GEM"
+  },
+  "1META.MI": {
+    "name": "Meta Platforms Inc.",
+    "isin": "US30303M1027",
+    "scraper": "borsa_italiana_gem",
+    "url": "https://www.borsaitaliana.it/borsa/azioni/global-equity-market/scheda/US30303M1027-BGEM.html?lang=it",
+    "currency": "EUR",
+    "exchange": "Milano GEM"
+  },
+  "1TSLA.MI": {
+    "name": "Tesla Inc.",
+    "isin": "US88160R1014",
+    "scraper": "borsa_italiana_gem",
+    "url": "https://www.borsaitaliana.it/borsa/azioni/global-equity-market/scheda/US88160R1014-BGEM.html?lang=it",
+    "currency": "EUR",
+    "exchange": "Milano GEM"
+  }
+}
