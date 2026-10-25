@@ -318,6 +318,9 @@ if (-not (Test-Path $portfoliosDir)) {
     New-Item -ItemType Directory -Path $portfoliosDir | Out-Null
 }
 
+# In-memory quote cache (ticker_range_interval -> @{ json = string; time = datetime })
+$script:QuoteCache = @{}
+
 # Simple request router loop
 while ($listener.IsListening) {
     try {
@@ -356,10 +359,28 @@ while ($listener.IsListening) {
             $response.OutputStream.Write($bytes, 0, $bytes.Length)
         }
         
+        # 1b. Server in-memory quote cache clear
+        elseif ($urlPath -eq "/api/cache/clear") {
+            $script:QuoteCache.Clear()
+            Write-Host "Server QuoteCache cleared." -ForegroundColor Cyan
+            $response.ContentType = "application/json; charset=utf-8"
+            $json = '{"status":"ok","message":"Cache cleared"}'
+            $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
+            $response.ContentLength64 = $bytes.Length
+            $response.OutputStream.Write($bytes, 0, $bytes.Length)
+        }
+
         # 2. CORS-free Yahoo Finance Quote Proxy
         # Handles range and interval for live performance tables and sparklines
         elseif ($urlPath -eq "/api/quote") {
             $ticker = $query["ticker"]
+            $force = ($query["force"] -eq "true")
+            $range = $query["range"]
+            if (-not $range) { $range = "1d" }
+            $interval = $query["interval"]
+            if (-not $interval) { $interval = "1m" }
+            if ($range -eq "1mo") { $interval = "1d" }
+
             if ($ticker) {
                 $ticker = $ticker.Trim()
                 if ($ticker.Contains('.')) {
@@ -369,6 +390,20 @@ while ($listener.IsListening) {
                         $base = $parts[0..($parts.Length - 2)] -join '.'
                         $ticker = "$base-$lastPart"
                     }
+                }
+            }
+            
+            $cacheKey = "$ticker`_$range`_$interval"
+            if (-not $force -and $script:QuoteCache.ContainsKey($cacheKey)) {
+                $cachedItem = $script:QuoteCache[$cacheKey]
+                if ($cachedItem -and $cachedItem.json) {
+                    Write-Host "Serving quote from server cache: $cacheKey" -ForegroundColor Green
+                    $response.ContentType = "application/json; charset=utf-8"
+                    $bytes = [System.Text.Encoding]::UTF8.GetBytes($cachedItem.json)
+                    $response.ContentLength64 = $bytes.Length
+                    $response.OutputStream.Write($bytes, 0, $bytes.Length)
+                    $response.Close()
+                    continue
                 }
             }
             
@@ -418,6 +453,9 @@ while ($listener.IsListening) {
                     }
                 }
                 $json = $resultObj | ConvertTo-Json -Depth 10
+                if ($json) {
+                    $script:QuoteCache[$cacheKey] = @{ json = $json; time = [DateTime]::UtcNow }
+                }
                 $response.ContentType = "application/json; charset=utf-8"
                 $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
                 $response.ContentLength64 = $bytes.Length
@@ -635,6 +673,9 @@ while ($listener.IsListening) {
                     }
                 }
                 $json = $resultObj | ConvertTo-Json -Depth 10
+                if ($json) {
+                    $script:QuoteCache[$cacheKey] = @{ json = $json; time = [DateTime]::UtcNow }
+                }
                 $response.ContentType = "application/json; charset=utf-8"
                 $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
                 $response.ContentLength64 = $bytes.Length
@@ -716,6 +757,7 @@ while ($listener.IsListening) {
                         }
                     }
                     $json = $resultObj | ConvertTo-Json -Depth 10
+                    $script:QuoteCache[$cacheKey] = @{ json = $json; time = [DateTime]::UtcNow }
                     $response.ContentType = "application/json; charset=utf-8"
                     $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
                     $response.ContentLength64 = $bytes.Length
@@ -816,6 +858,7 @@ while ($listener.IsListening) {
                         }
                     }
                     $json = $resultObj | ConvertTo-Json -Depth 10
+                    $script:QuoteCache[$cacheKey] = @{ json = $json; time = [DateTime]::UtcNow }
                     $response.ContentType = "application/json; charset=utf-8"
                     $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
                     $response.ContentLength64 = $bytes.Length
@@ -950,6 +993,9 @@ while ($listener.IsListening) {
                     Write-Host "Warning during stale-detection on quote: $_" -ForegroundColor Yellow
                 }
                 
+                if ($json) {
+                    $script:QuoteCache[$cacheKey] = @{ json = $json; time = [DateTime]::UtcNow }
+                }
                 $response.ContentType = "application/json; charset=utf-8"
                 $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
                 $response.ContentLength64 = $bytes.Length

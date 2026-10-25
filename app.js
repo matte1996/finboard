@@ -124,6 +124,60 @@ document.addEventListener('DOMContentLoaded', () => {
     let depositsCurrentPage = 1;
 
     // --------------------------------------------------------------------------
+    // SESSION PRICE CACHE (SessionStorage + In-Memory Fast Lookup)
+    // --------------------------------------------------------------------------
+    const PriceCache = {
+        key: 'finboard_session_prices',
+        memory: {},
+
+        init() {
+            try {
+                const raw = sessionStorage.getItem(this.key);
+                if (raw) {
+                    this.memory = JSON.parse(raw);
+                }
+            } catch (e) {
+                console.warn("Failed to load session price cache:", e);
+                this.memory = {};
+            }
+        },
+
+        get(ticker) {
+            if (!ticker) return null;
+            const clean = ticker.toUpperCase().trim();
+            return this.memory[clean] || null;
+        },
+
+        set(ticker, quote) {
+            if (!ticker || !quote) return;
+            const clean = ticker.toUpperCase().trim();
+            this.memory[clean] = {
+                ...quote,
+                cachedAt: Date.now()
+            };
+            try {
+                sessionStorage.setItem(this.key, JSON.stringify(this.memory));
+            } catch (e) {}
+        },
+
+        has(ticker) {
+            if (!ticker) return false;
+            const clean = ticker.toUpperCase().trim();
+            return !!this.memory[clean];
+        },
+
+        clear() {
+            this.memory = {};
+            try {
+                sessionStorage.removeItem(this.key);
+            } catch (e) {}
+        }
+    };
+    PriceCache.init();
+
+    let sessionMarketIndicators = null;
+
+    // --------------------------------------------------------------------------
     // 3. TIME & MARKET HOURS ANALYSIS
     // --------------------------------------------------------------------------
     function isEuropeanMarketOpen() {
@@ -404,14 +458,24 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error("Proxy fetch failed");
     }
 
-    async function updateExchangeRate() {
+    async function updateExchangeRate(forceRefresh = false) {
+        if (!forceRefresh && PriceCache.has('EURUSD=X')) {
+            const cached = PriceCache.get('EURUSD=X');
+            if (cached && cached.price) {
+                cachedEURUSD = cached.price;
+                return;
+            }
+        }
+
         if (serverMode) {
             try {
-                const res = await apiFetch('/api/quote?ticker=EURUSD=X');
+                const forceParam = forceRefresh ? '&force=true' : '';
+                const res = await apiFetch(`/api/quote?ticker=EURUSD=X${forceParam}`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data.chart && data.chart.result && data.chart.result[0]) {
                         cachedEURUSD = data.chart.result[0].meta.regularMarketPrice || 1.1641;
+                        PriceCache.set('EURUSD=X', { price: cachedEURUSD, symbol: 'EURUSD=X' });
                         console.log(`Live exchange rate from Server Proxy: 1 EUR = ${cachedEURUSD} USD`);
                     }
                 }
@@ -424,6 +488,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await fetchWithProxy('https://query1.finance.yahoo.com/v8/finance/chart/EURUSD=X');
                 if (data && data.chart && data.chart.result && data.chart.result[0]) {
                     cachedEURUSD = data.chart.result[0].meta.regularMarketPrice || 1.1641;
+                    PriceCache.set('EURUSD=X', { price: cachedEURUSD, symbol: 'EURUSD=X' });
                 }
             } catch (e) {
                 cachedEURUSD = MOCK_STOCK_DATABASE['EURUSD=X'].price;
@@ -431,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function updateMarketIndicators() {
+    async function updateMarketIndicators(forceRefresh = false) {
         const valBtc = document.getElementById('val-btc');
         const valSp500 = document.getElementById('val-sp500');
         const valEurusd = document.getElementById('val-eurusd');
@@ -448,6 +513,17 @@ document.addEventListener('DOMContentLoaded', () => {
             valRussell.innerText = `2,050.00 pt`;
             valBtp10y.innerText = `3.85%`;
             valUs10y.innerText = `4.45%`;
+            return;
+        }
+
+        // Return cached indicator texts if available and not forced
+        if (!forceRefresh && sessionMarketIndicators) {
+            valBtc.innerText = sessionMarketIndicators.btc;
+            valSp500.innerText = sessionMarketIndicators.sp500;
+            valEurusd.innerText = sessionMarketIndicators.eurusd;
+            valRussell.innerText = sessionMarketIndicators.russell;
+            valBtp10y.innerText = sessionMarketIndicators.btp10y;
+            valUs10y.innerText = sessionMarketIndicators.us10y;
             return;
         }
 
@@ -576,23 +652,38 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Failed to fetch US 10Y yield:", e);
         }
 
+        sessionMarketIndicators = {
+            btc: valBtc.innerText,
+            sp500: valSp500.innerText,
+            eurusd: valEurusd.innerText,
+            russell: valRussell.innerText,
+            btp10y: valBtp10y.innerText,
+            us10y: valUs10y.innerText
+        };
     }
 
-    async function getStockQuote(ticker) {
+    async function getStockQuote(ticker, forceRefresh = false) {
         const cleanTicker = ticker.toUpperCase().trim();
         
         if (isMockMode) {
             return getMockQuote(cleanTicker);
         }
 
+        // Return from session cache if available and not forced
+        if (!forceRefresh && PriceCache.has(cleanTicker)) {
+            return PriceCache.get(cleanTicker);
+        }
+
+        let quote = null;
         if (serverMode) {
             try {
-                const res = await apiFetch(`/api/quote?ticker=${cleanTicker}`);
+                const forceParam = forceRefresh ? '&force=true' : '';
+                const res = await apiFetch(`/api/quote?ticker=${cleanTicker}${forceParam}`);
                 if (res.ok) {
                     const data = await res.json();
                     if (data.chart && data.chart.result && data.chart.result[0]) {
                         const meta = data.chart.result[0].meta;
-                        return {
+                        quote = {
                             symbol: meta.symbol,
                             name: meta.longName || meta.shortName || meta.symbol,
                             price: meta.regularMarketPrice,
@@ -608,10 +699,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         };
                     }
                 }
-                throw new Error("Invalid quote payload");
+                if (!quote) throw new Error("Invalid quote payload");
             } catch (e) {
                 console.warn(`Local server fetch failed for ${cleanTicker}. Using simulated quote.`, e);
-                return getMockQuote(cleanTicker);
+                quote = getMockQuote(cleanTicker);
             }
         } else {
             // Static mode: fetch via public proxies
@@ -647,7 +738,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
-                    return {
+                    quote = {
                         symbol: meta.symbol,
                         name: meta.longName || meta.shortName || meta.symbol,
                         price: resolvedPrice,
@@ -662,12 +753,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         lastUpdateDate: lastUpdateDate
                     };
                 }
-                throw new Error();
+                if (!quote) throw new Error();
             } catch (e) {
                 console.warn(`CORS proxy failed for ${cleanTicker}. Using simulated quote.`, e);
-                return getMockQuote(cleanTicker);
+                quote = getMockQuote(cleanTicker);
             }
         }
+
+        if (quote) {
+            PriceCache.set(cleanTicker, quote);
+        }
+        return quote;
     }
 
     function getMockQuote(ticker) {
@@ -1362,9 +1458,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnRefreshPrices.addEventListener('click', async () => {
         refreshIcon.classList.add('spinning');
+        PriceCache.clear();
+        sessionMarketIndicators = null;
+        if (serverMode) {
+            try {
+                await apiFetch('/api/cache/clear');
+            } catch (e) {}
+        }
         await loadAllPortfolios(); // Reload metadata from folders
-        await renderDashboard(); // Redraws everything
+        await renderDashboard(true); // Redraws everything with fresh online prices
         refreshIcon.classList.remove('spinning');
+        
+        const nowStr = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+        btnRefreshPrices.title = `Prezzi aggiornati alle ${nowStr} (Clicca per aggiornare di nuovo)`;
     });
 
     function populateAssetTypeDropdown() {
@@ -1396,7 +1502,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function renderDashboard() {
+    async function renderDashboard(forceRefresh = false) {
         const activePort = state.portfolios[state.activePortfolioId];
         if (!activePort) {
             showScreen('selector');
@@ -1442,8 +1548,8 @@ document.addEventListener('DOMContentLoaded', () => {
         renderQuickStats(activePort.cash, activePort.cash, 0);
         renderHoldingsTable(true);
         
-        // 3. Resolve live pricing
-        await refreshDashboardPrices();
+        // 3. Resolve live pricing (from session cache if not forced)
+        await refreshDashboardPrices(forceRefresh);
         
         // 4. Draw Chart
         renderNetWorthChart();
@@ -2143,7 +2249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    async function resolveHoldingsPrices(holdingsList) {
+    async function resolveHoldingsPrices(holdingsList, forceRefresh = false) {
         const isEuOpen = isEuropeanMarketOpen();
         const promises = holdingsList.map(async (h) => {
             const assetType = h.type || getDefaultAssetType(h.ticker, h.isin);
@@ -2240,7 +2346,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const quote = await getStockQuote(targetTicker);
+                const quote = await getStockQuote(targetTicker, forceRefresh);
                 
                 let currentPriceEUR = quote.price;
                 if (quote.currency === "USD" || wasConverted) {
@@ -2325,13 +2431,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function refreshDashboardPrices() {
+    async function refreshDashboardPrices(forceRefresh = false) {
         const port = getActivePortfolio();
         if (!port) return;
 
         updateMarketStatusIndicator();
-        await updateExchangeRate();
-        updateMarketIndicators();
+        await updateExchangeRate(forceRefresh);
+        updateMarketIndicators(forceRefresh);
         
         if (port.holdings.length === 0) {
             cachedResolvedHoldings = [];
@@ -2355,7 +2461,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const remaining = sortedHoldings.slice(10);
 
         // 2. Load top 10 immediately in parallel
-        const top10Resolved = await resolveHoldingsPrices(top10);
+        const top10Resolved = await resolveHoldingsPrices(top10, forceRefresh);
         
         // Save the metadata (updating lastPrice on top 10)
         await savePortfolioMetadata();
@@ -2398,7 +2504,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 3. Preload remaining items in background
         if (remaining.length > 0) {
-            resolveHoldingsPrices(remaining).then(async (remainingResolved) => {
+            resolveHoldingsPrices(remaining, forceRefresh).then(async (remainingResolved) => {
                 // Ensure the user hasn't switched portfolios in the meantime
                 const currentPort = getActivePortfolio();
                 if (!currentPort || currentPort.id !== port.id) return;
@@ -3306,8 +3412,17 @@ document.addEventListener('DOMContentLoaded', () => {
         btnRefreshAggregate.addEventListener('click', async () => {
             const refreshIcon = document.getElementById('refresh-icon-aggregate');
             if (refreshIcon) refreshIcon.classList.add('spinning');
+            PriceCache.clear();
+            sessionMarketIndicators = null;
+            if (serverMode) {
+                try {
+                    await apiFetch('/api/cache/clear');
+                } catch (e) {}
+            }
             try {
                 await loadAndRenderAggregateView(true);
+                const nowStr = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+                btnRefreshAggregate.title = `Prezzi consolidati aggiornati alle ${nowStr}`;
             } finally {
                 if (refreshIcon) refreshIcon.classList.remove('spinning');
             }
@@ -3512,7 +3627,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (contentEl) contentEl.classList.add('hidden');
 
         try {
-            await updateExchangeRate();
+            await updateExchangeRate(forceRefresh);
 
             let allHoldingsToResolve = [];
             selectedPorts.forEach(port => {
@@ -3531,7 +3646,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             let resolvedHoldings = [];
             if (allHoldingsToResolve.length > 0) {
-                const rawResolved = await resolveHoldingsPrices(allHoldingsToResolve);
+                const rawResolved = await resolveHoldingsPrices(allHoldingsToResolve, forceRefresh);
                 resolvedHoldings = rawResolved.map((res, index) => {
                     const orig = allHoldingsToResolve[index] || {};
                     return {
