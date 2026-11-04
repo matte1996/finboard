@@ -1072,11 +1072,124 @@ document.addEventListener('DOMContentLoaded', () => {
         return portfolio.holdings.reduce((sum, h) => sum + (h.shares * h.buyPrice), 0);
     }
 
-    function renderQuickStats(cash, netWorth, totalProfit) {
+    function isMixedOrPensionHolding(h, customTypologies) {
+        if (!h) return false;
+        const type = h.type || getDefaultAssetType(h.ticker, h.isin);
+        if (type) {
+            const lower = type.toLowerCase();
+            if (lower.startsWith('mixed')) return true;
+            if (customTypologies && customTypologies[type] && customTypologies[type].type === 'mixed') return true;
+            if (globalCustomTypologies && globalCustomTypologies[type] && globalCustomTypologies[type].type === 'mixed') return true;
+        }
+        // Se il titolo ha una tipologia standard definita (Stocks, Bond, Crypto, Hard assets, CASH), non è mixed/pensione
+        if (type === 'Stocks' || type === 'Bond' || type === 'Crypto' || type === 'Hard assets' || type === 'CASH') {
+            return false;
+        }
+        const tUpper = (h.ticker || '').toUpperCase();
+        if (tUpper.includes('4PAPRST') || tUpper.includes('SECONDAPENSIONE') || tUpper.includes('FONTE-DINAMICO') || tUpper.includes('GENGRRB') || tUpper.includes('AMUNDI-ESPANSIONE')) {
+            return true;
+        }
+        const nameUpper = (h.name || '').toUpperCase();
+        if (nameUpper.includes('FONDO PENSIONE') || nameUpper.includes('SECONDAPENSIONE') || nameUpper.includes('PREVIDENZA') || nameUpper.includes('FONDO FONTE')) {
+            return true;
+        }
+        return false;
+    }
+
+    function isBondHolding(h) {
+        if (!h) return false;
+        const type = h.type || getDefaultAssetType(h.ticker, h.isin);
+        if (type === 'Bond') return true;
+        if (type === 'Stocks' || type === 'Crypto' || type === 'Hard assets' || type === 'CASH') {
+            return false;
+        }
+        const tUpper = (h.ticker || '').toUpperCase();
+        if (tUpper === 'BOND' || tUpper === 'BOT' || tUpper.includes('BOND') || tUpper.includes('BOT') || tUpper.includes('BND') || tUpper.includes('GOV') || tUpper.includes('XG7S')) {
+            return true;
+        }
+        if (h.isin && h.isin.toUpperCase().startsWith('IT') && !h.isin.toUpperCase().startsWith('IT0000072618')) {
+            const nameUpper = (h.name || '').toUpperCase();
+            if (nameUpper.includes('BTP') || nameUpper.includes('BOT') || nameUpper.includes('CCT') || nameUpper.includes('CTZ')) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function calculateHoldingTaxAndNet(h, customTypologies) {
+        if (!h) return { tax: 0, netValue: 0, taxRate: 0, taxBase: 'none' };
+        const assetType = h.type || getDefaultAssetType(h.ticker, h.isin);
+        const curVal = Number(h.currentValue) || 0;
+        const pnl = Number(h.pnl) || 0;
+
+        // CASH / Liquidità: no tax
+        if (assetType === 'CASH' || (h.ticker && h.ticker.toUpperCase() === 'CASH')) {
+            return {
+                tax: 0,
+                netValue: curVal,
+                taxRate: 0,
+                taxBase: 'none'
+            };
+        }
+
+        // Rule 3: Titoli Mixed / Fondi Pensione -> 23% sul TOTALE dell'asset
+        if (isMixedOrPensionHolding(h, customTypologies)) {
+            const tax = curVal * 0.23;
+            return {
+                tax: tax,
+                netValue: curVal - tax,
+                taxRate: 0.23,
+                taxBase: 'total'
+            };
+        }
+
+        // Rule 1: Titoli in perdita o pareggio -> 0% tasse, valore pieno
+        if (pnl <= 0) {
+            return {
+                tax: 0,
+                netValue: curVal,
+                taxRate: 0,
+                taxBase: 'gain'
+            };
+        }
+
+        // Rule 2: Titoli Obbligazionari in guadagno -> 12,5% sulla plusvalenza
+        if (isBondHolding(h)) {
+            const tax = pnl * 0.125;
+            return {
+                tax: tax,
+                netValue: curVal - tax,
+                taxRate: 0.125,
+                taxBase: 'gain'
+            };
+        }
+
+        // Rule 4: Tutti gli altri titoli in guadagno -> 26% sulla plusvalenza
+        const tax = pnl * 0.26;
+        return {
+            tax: tax,
+            netValue: curVal - tax,
+            taxRate: 0.26,
+            taxBase: 'gain'
+        };
+    }
+
+    function renderQuickStats(cash, netWorth, totalProfit, nettissimo, totalTaxes) {
+        const globalNettissimo = document.getElementById('global-nettissimo');
         const globalNetWorth = document.getElementById('global-net-worth');
         const globalHoldingsValue = document.getElementById('global-holdings-value');
         const globalCash = document.getElementById('global-cash');
         const globalTotalProfit = document.getElementById('global-total-profit');
+
+        const resolvedNettissimo = (nettissimo !== undefined && nettissimo !== null) ? nettissimo : netWorth;
+        if (globalNettissimo) {
+            globalNettissimo.innerText = `€ ${formatMoney(resolvedNettissimo)}`;
+            if (totalTaxes !== undefined && totalTaxes !== null && totalTaxes > 0) {
+                globalNettissimo.title = `Patrimonio al netto delle imposte simulate di vendita/riscatto (-€ ${formatMoney(totalTaxes)} di tasse stimate)`;
+            } else {
+                globalNettissimo.title = "Patrimonio al netto delle imposte simulate di vendita/riscatto";
+            }
+        }
 
         if (globalNetWorth) globalNetWorth.innerText = `€ ${formatMoney(netWorth)}`;
         if (globalCash) globalCash.innerText = `€ ${formatMoney(cash)}`;
@@ -1545,7 +1658,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 2. Draw static layouts
-        renderQuickStats(activePort.cash, activePort.cash, 0);
+        renderQuickStats(activePort.cash, activePort.cash, 0, activePort.cash, 0);
         renderHoldingsTable(true);
         
         // 3. Resolve live pricing (from session cache if not forced)
@@ -2415,14 +2528,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let totalInvestedCost = 0;
         let totalCurrentValue = 0;
+        let totalEstimatedTaxes = 0;
+
+        const customTypologies = getMergedTypologies(port);
 
         cachedResolvedHoldings.forEach(h => {
-            totalInvestedCost += h.buyCost;
-            totalCurrentValue += h.currentValue;
+            totalInvestedCost += h.buyCost || 0;
+            totalCurrentValue += h.currentValue || 0;
+            const taxInfo = calculateHoldingTaxAndNet(h, customTypologies);
+            totalEstimatedTaxes += taxInfo.tax;
         });
 
         const totalRealTimeValue = port.cash + totalCurrentValue;
-        renderQuickStats(port.cash, totalRealTimeValue, totalCurrentValue - totalInvestedCost);
+        const totalNettissimo = totalRealTimeValue - totalEstimatedTaxes;
+        renderQuickStats(port.cash, totalRealTimeValue, totalCurrentValue - totalInvestedCost, totalNettissimo, totalEstimatedTaxes);
         updatePieChartFromCached();
 
         if (port.lastRealTimeValue !== totalRealTimeValue) {
@@ -2442,7 +2561,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (port.holdings.length === 0) {
             cachedResolvedHoldings = [];
             renderHoldingsTable(false, []);
-            renderQuickStats(port.cash, port.cash, 0);
+            renderQuickStats(port.cash, port.cash, 0, port.cash, 0);
             updatePieChartFromCached();
             return;
         }
@@ -3513,11 +3632,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!data) return;
 
         // 1. KPI Cards
+        const nettissimoEl = document.getElementById('aggregate-nettissimo');
         const netWorthEl = document.getElementById('aggregate-net-worth');
         const holdingsValEl = document.getElementById('aggregate-holdings-value');
         const cashEl = document.getElementById('aggregate-cash');
         const profitEl = document.getElementById('aggregate-total-profit');
         const countBadge = document.getElementById('aggregate-total-assets-count');
+
+        if (nettissimoEl) {
+            const aggrNettissimo = data.totalNettissimo !== undefined ? data.totalNettissimo : (data.totalNetWorth - (data.totalEstimatedTaxes || 0));
+            nettissimoEl.innerText = isPrivacyMode ? '€ *****' : `€ ${formatMoney(aggrNettissimo)}`;
+            if (data.totalEstimatedTaxes && data.totalEstimatedTaxes > 0) {
+                nettissimoEl.title = `Patrimonio al netto delle imposte simulate di vendita/riscatto (-€ ${formatMoney(data.totalEstimatedTaxes)} di tasse stimate)`;
+            } else {
+                nettissimoEl.title = "Patrimonio al netto delle imposte simulate di vendita/riscatto";
+            }
+        }
 
         if (netWorthEl) netWorthEl.innerText = isPrivacyMode ? '€ *****' : `€ ${formatMoney(data.totalNetWorth)}`;
         if (holdingsValEl) holdingsValEl.innerText = isPrivacyMode ? '€ *****' : `€ ${formatMoney(data.totalHoldingsValue)}`;
@@ -3660,12 +3790,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let totalInvestedCost = 0;
             let totalHoldingsValue = 0;
+            let totalEstimatedTaxes = 0;
+
             resolvedHoldings.forEach(h => {
                 totalInvestedCost += h.buyCost || 0;
                 totalHoldingsValue += h.currentValue || 0;
+                const customTypologies = { ...globalCustomTypologies, ...(h.portCustomTypologies || {}) };
+                const taxInfo = calculateHoldingTaxAndNet(h, customTypologies);
+                totalEstimatedTaxes += taxInfo.tax;
             });
 
             const totalNetWorth = totalCash + totalHoldingsValue;
+            const totalNettissimo = totalNetWorth - totalEstimatedTaxes;
             const totalPnl = totalHoldingsValue - totalInvestedCost;
             const totalPnlPercent = totalInvestedCost > 0 ? (totalPnl / totalInvestedCost) * 100 : 0;
 
@@ -3791,6 +3927,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 totalInvestedCost,
                 totalHoldingsValue,
                 totalNetWorth,
+                totalEstimatedTaxes,
+                totalNettissimo,
                 totalPnl,
                 totalPnlPercent,
                 categoriesList,

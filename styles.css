@@ -780,8 +780,9 @@ textarea {
 .header-stats {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
-    gap: 24px;
+    justify-content: flex-start;
+    gap: 18px;
+    flex-wrap: nowrap;
 }
 
 .stat-item {
@@ -789,6 +790,7 @@ textarea {
     flex-direction: column;
     gap: 4px;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .stat-label {
@@ -1502,6 +1504,15 @@ textarea {
 /* ==========================================================================
    RESPONSIVE DESIGN (MEDIA QUERIES)
    ========================================================================== */
+
+@media (max-width: 1380px) and (min-width: 1201px) {
+    .header-stats {
+        gap: 14px;
+    }
+    .stat-value {
+        font-size: 1.05rem;
+    }
+}
 
 @media (max-width: 1200px) {
     .panel-layout-grid,
