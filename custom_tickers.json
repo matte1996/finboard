@@ -70,5 +70,29 @@
     "url": "https://www.borsaitaliana.it/borsa/azioni/global-equity-market/scheda/US88160R1014-BGEM.html?lang=it",
     "currency": "EUR",
     "exchange": "Milano GEM"
+  },
+  "1RDDT.MI": {
+    "name": "Reddit, Inc.",
+    "isin": "US75734B1008",
+    "scraper": "borsa_italiana_gem",
+    "url": "https://www.borsaitaliana.it/borsa/search/scheda.html?code=US75734B1008&lang=it",
+    "currency": "EUR",
+    "exchange": "Milano GEM"
+  },
+  "1APP.MI": {
+    "name": "AppLovin Corporation",
+    "isin": "US03831W1080",
+    "scraper": "borsa_italiana_gem",
+    "url": "https://www.borsaitaliana.it/borsa/search/scheda.html?code=US03831W1080&lang=it",
+    "currency": "EUR",
+    "exchange": "Milano GEM"
+  },
+  "1ADBE.MI": {
+    "name": "Adobe Inc.",
+    "isin": "US00724F1012",
+    "scraper": "borsa_italiana_gem",
+    "url": "https://www.borsaitaliana.it/borsa/search/scheda.html?code=US00724F1012&lang=it",
+    "currency": "EUR",
+    "exchange": "Milano GEM"
   }
 }

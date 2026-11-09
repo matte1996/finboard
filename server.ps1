@@ -220,13 +220,169 @@ function Find-CustomTicker {
     return $null
 }
 
+function Save-CustomTickerEntry {
+    param(
+        [string]$ticker,
+        [hashtable]$entry
+    )
+    if ([string]::IsNullOrWhiteSpace($ticker) -or $null -eq $entry) { return $false }
+    $cleanTicker = $ticker.Trim().ToUpper()
+
+    $rootDir = if ($script:PSScriptRoot) { $script:PSScriptRoot } elseif ($PSScriptRoot) { $PSScriptRoot } else { (Get-Item .).FullName }
+    $cfgPath = Join-Path $rootDir "custom_tickers.json"
+
+    try {
+        $dict = [ordered]@{}
+        if (Test-Path $cfgPath) {
+            $raw = Get-Content -Path $cfgPath -Raw -Encoding UTF8
+            if ($raw) {
+                $existing = $raw | ConvertFrom-Json
+                foreach ($prop in $existing.PSObject.Properties) {
+                    $dict[$prop.Name] = $prop.Value
+                }
+            }
+        }
+        $dict[$cleanTicker] = $entry
+        $json = $dict | ConvertTo-Json -Depth 5
+        [System.IO.File]::WriteAllText($cfgPath, $json, [System.Text.Encoding]::UTF8)
+        Write-Host "Auto-registered custom ticker $cleanTicker into custom_tickers.json" -ForegroundColor Green
+        return $true
+    } catch {
+        Write-Host "Error saving custom ticker $($cleanTicker): $_" -ForegroundColor Yellow
+        return $false
+    }
+}
+
+function Discover-BorsaItalianaMapping {
+    param(
+        [string]$ticker,
+        [string]$isin,
+        [string]$name
+    )
+    if ([string]::IsNullOrWhiteSpace($ticker) -and [string]::IsNullOrWhiteSpace($isin)) { return $null }
+
+    $cleanTicker = if ($ticker) { $ticker.Trim().ToUpper() } else { "" }
+    $cleanIsin = if ($isin) { $isin.Trim().ToUpper() } else { "" }
+
+    # 1. Direct ISIN check via canonical 302 redirect
+    if ($cleanIsin -match '^[A-Z]{2}[A-Z0-9]{9}[0-9]$') {
+        $canonicalUrl = "https://www.borsaitaliana.it/borsa/search/scheda.html?code=$cleanIsin&lang=it"
+        $quote = Get-BorsaItalianaStockQuote -url $canonicalUrl -isin $cleanIsin
+        if ($quote -and $quote.price -gt 0) {
+            $discoveredName = if ($quote.name) { $quote.name } elseif ($name) { $name } else { $cleanTicker }
+            $exch = if ($cleanTicker.StartsWith("1") -or -not $cleanIsin.StartsWith("IT")) { "Milano GEM" } else { "Milano" }
+            return @{
+                name = $discoveredName
+                isin = $cleanIsin
+                scraper = if ($cleanTicker.StartsWith("1") -or -not $cleanIsin.StartsWith("IT")) { "borsa_italiana_gem" } else { "borsa_italiana" }
+                url = $canonicalUrl
+                currency = "EUR"
+                exchange = $exch
+            }
+        }
+    }
+
+    # 2. If GEM ticker (1***.MI or starts with 1)
+    if ($cleanTicker.StartsWith("1") -and ($cleanTicker.EndsWith(".MI") -or $cleanTicker.Length -ge 4)) {
+        $baseSym = $cleanTicker.Substring(1).Replace(".MI", "")
+        $queries = @()
+        if ($name) {
+            $cleanName = ($name -replace '[,.]', ' ' -replace '(?i)\b(Inc|Corp|Corporation|S\.p\.A|A\/S|AG|Plc|Class A|Class B|Holdings?)\b', ' ').Trim()
+            $firstWord = ($cleanName -split '\s+')[0]
+            if ($firstWord) { $queries += $firstWord }
+            if ($cleanName -and $cleanName -ne $firstWord) { $queries += $cleanName }
+        }
+        $queries += $baseSym
+
+        foreach ($q in $queries) {
+            if (-not $q) { continue }
+            try {
+                $sUrl = "https://www.borsaitaliana.it/borsa/searchengine/search.html?q=$([Uri]::EscapeDataString($q))&lang=it"
+                $lines = & curl.exe -s -L --max-time 6 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" $sUrl
+                $html = $lines -join "`n"
+
+                # Check for mic=BGEM
+                if ($html -match '(?si)code=([A-Z0-9]{12})&(?:amp;)?mic=BGEM') {
+                    $foundIsin = $matches[1]
+                    $canonicalUrl = "https://www.borsaitaliana.it/borsa/search/scheda.html?code=$foundIsin&lang=it"
+                    $quote = Get-BorsaItalianaStockQuote -url $canonicalUrl -isin $foundIsin
+                    $finalName = if ($quote -and $quote.name) { $quote.name } elseif ($name) { $name } else { $baseSym }
+                    return @{
+                        name = $finalName
+                        isin = $foundIsin
+                        scraper = "borsa_italiana_gem"
+                        url = $canonicalUrl
+                        currency = "EUR"
+                        exchange = "Milano GEM"
+                    }
+                }
+            } catch {
+                Write-Host "Error during Borsa Italiana search for $($q): $_" -ForegroundColor Yellow
+            }
+        }
+    }
+
+    return $null
+}
+
+function AutoRegister-HoldingCustomTicker {
+    param(
+        [string]$ticker,
+        [string]$isin,
+        [string]$name
+    )
+    if ([string]::IsNullOrWhiteSpace($ticker)) { return $null }
+    $cleanTicker = $ticker.Trim().ToUpper()
+
+    # Check if already registered
+    $existing = Find-CustomTicker -queryStr $cleanTicker
+    if ($null -ne $existing) {
+        return $existing
+    }
+
+    # Only attempt auto-discovery for Milan / GEM instruments (.MI or starting with 1)
+    if (-not $cleanTicker.EndsWith(".MI") -and -not $cleanTicker.StartsWith("1")) {
+        return $null
+    }
+
+    Write-Host "Attempting auto-discovery for custom ticker: $cleanTicker ($name)..." -ForegroundColor Cyan
+    $discovered = Discover-BorsaItalianaMapping -ticker $cleanTicker -isin $isin -name $name
+    if ($null -ne $discovered) {
+        Save-CustomTickerEntry -ticker $cleanTicker -entry $discovered | Out-Null
+        return $discovered
+    }
+
+    return $null
+}
+
+function Sync-AllPortfoliosCustomTickers {
+    Write-Host "Syncing custom tickers from all portfolio holdings..." -ForegroundColor Cyan
+    $ports = Get-ChildItem -Path $portfoliosDir -Filter "metadata.json" -Recurse -ErrorAction SilentlyContinue
+    foreach ($p in $ports) {
+        try {
+            $raw = Get-Content -Path $p.FullName -Raw -Encoding UTF8
+            $json = $raw | ConvertFrom-Json
+            if ($json.holdings) {
+                foreach ($h in $json.holdings) {
+                    $t = [string]$h.ticker
+                    $isin = [string]$h.isin
+                    $hName = [string]$h.name
+                    if ($t -and ($t.EndsWith(".MI") -or $t.StartsWith("1"))) {
+                        AutoRegister-HoldingCustomTicker -ticker $t -isin $isin -name $hName | Out-Null
+                    }
+                }
+            }
+        } catch {}
+    }
+}
+
 function Get-BorsaItalianaStockQuote {
     param(
         [string]$url,
         [string]$isin
     )
     if (-not $url -and $isin) {
-        $url = "https://www.borsaitaliana.it/borsa/azioni/scheda/$isin.html?lang=it"
+        $url = "https://www.borsaitaliana.it/borsa/search/scheda.html?code=$isin&lang=it"
     }
     if (-not $url) { return $null }
 
@@ -251,6 +407,8 @@ function Get-BorsaItalianaStockQuote {
         $name = $null
         if ($html -match '(?si)<h1[^>]*class="[^"]*flola-bold[^"]*"[^>]*>\s*<a[^>]*>\s*([^<]+?)\s*</a>') {
             $name = $matches[1].Trim()
+        } elseif ($html -match '(?si)<title>\s*Azioni\s*([^:<]+?)\s*:\s*quotazioni') {
+            $name = $matches[1].Trim()
         } elseif ($html -match '(?si)<title>\s*([^<]+?)\s*-\s*Quotazioni') {
             $name = $matches[1].Trim()
         }
@@ -260,11 +418,18 @@ function Get-BorsaItalianaStockQuote {
         if ($html -match '(?si)<span[^>]*class="[^"]*percPrice[^"]*"[^>]*>\s*<strong>\s*([+-]?[0-9.,]+)%?\s*</strong>') {
             $pctStr = $matches[1].Replace("+", "").Replace("%", "").Replace(",", ".").Trim()
             [double]::TryParse($pctStr, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$pctChange) | Out-Null
+        } elseif ($html -match '(?si)<span[^>]*class="[^"]*t-text -right -(?:assertive|positive)[^"]*">\s*([+-]?[0-9.,]+)%\s*</span>') {
+            $pctStr = $matches[1].Replace("+", "").Replace("%", "").Replace(",", ".").Trim()
+            [double]::TryParse($pctStr, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$pctChange) | Out-Null
         }
 
         # Previous close
-        $prevClose = [Math]::Round($price / (1.0 + ($pctChange / 100.0)), 4)
-        if ($html -match '(?si)<span[^>]*class="[^"]*t-text -right[^"]*">\s*([0-9.,]+)\s*-\s*[0-9/]+\s*</span>') {
+        $prevClose = if ($pctChange -ne 0) {
+            [Math]::Round($price / (1.0 + ($pctChange / 100.0)), 4)
+        } else {
+            $price
+        }
+        if ($html -match '(?si)(?:Chiusura Precedente|Prezzo di riferimento|Precedente)[^<]*(?:<[^>]+>[^<]*){0,4}<span[^>]*>\s*([0-9.,]+)\s*</span>') {
             $prevStr = $matches[1].Replace(".", "").Replace(",", ".").Trim()
             $parsedPrev = 0.0
             if ([double]::TryParse($prevStr, [System.Globalization.NumberStyles]::Any, [System.Globalization.CultureInfo]::InvariantCulture, [ref]$parsedPrev) -and $parsedPrev -gt 0) {
@@ -320,6 +485,13 @@ if (-not (Test-Path $portfoliosDir)) {
 
 # In-memory quote cache (ticker_range_interval -> @{ json = string; time = datetime })
 $script:QuoteCache = @{}
+
+# Auto-sync custom tickers from all portfolio holdings on startup
+try {
+    Sync-AllPortfoliosCustomTickers
+} catch {
+    Write-Host "Warning: Initial custom ticker sync failed: $_" -ForegroundColor Yellow
+}
 
 # Simple request router loop
 while ($listener.IsListening) {
@@ -781,6 +953,10 @@ while ($listener.IsListening) {
             $customTicker = $null
             if ($ticker) {
                 $customTicker = Find-CustomTicker -queryStr $ticker
+                if ($null -eq $customTicker -and ($ticker.EndsWith(".MI") -or $ticker.StartsWith("1"))) {
+                    # Auto-discover on demand!
+                    $customTicker = AutoRegister-HoldingCustomTicker -ticker $ticker -isin "" -name ""
+                }
             }
             if ($null -ne $customTicker) {
                 Write-Host "Scraping custom ticker quote: $ticker ($($customTicker.name))" -ForegroundColor Cyan
@@ -964,9 +1140,15 @@ while ($listener.IsListening) {
                         
                         # If still stale (>48h) and ticker is Italian (.MI), attempt Borsa Italiana fallback
                         if ($ageHours -gt 48.0 -and $ticker.EndsWith(".MI")) {
-                            $baseSym = $ticker.Replace(".MI", "")
-                            Write-Host "Attempting Borsa Italiana scraping fallback for $ticker..." -ForegroundColor Cyan
-                            $bFallback = Get-BorsaItalianaStockQuote -url $null -isin $baseSym
+                            Write-Host "Attempting Borsa Italiana scraping fallback for stale $ticker..." -ForegroundColor Cyan
+                            $custom = AutoRegister-HoldingCustomTicker -ticker $ticker -isin "" -name ""
+                            $bFallback = $null
+                            if ($null -ne $custom) {
+                                $bFallback = Get-BorsaItalianaStockQuote -url $custom.url -isin $custom.isin
+                            } else {
+                                $baseSym = $ticker.Replace(".MI", "")
+                                $bFallback = Get-BorsaItalianaStockQuote -url $null -isin $baseSym
+                            }
                             if ($null -ne $bFallback) {
                                 Write-Host "Borsa Italiana fallback successful for $($ticker): $($bFallback.price) EUR" -ForegroundColor Green
                                 $meta.regularMarketPrice = $bFallback.price
@@ -1598,6 +1780,18 @@ while ($listener.IsListening) {
                         $metaPath = Join-Path $dirPath "metadata.json"
                         $body | Out-File -FilePath $metaPath -Encoding UTF8
                         
+                        # Auto-discover and register any new holdings into custom_tickers.json
+                        if ($metaJson.holdings) {
+                            foreach ($h in $metaJson.holdings) {
+                                $hTicker = [string]$h.ticker
+                                $hIsin = [string]$h.isin
+                                $hName = [string]$h.name
+                                if ($hTicker -and ($hTicker.EndsWith(".MI") -or $hTicker.StartsWith("1"))) {
+                                    AutoRegister-HoldingCustomTicker -ticker $hTicker -isin $hIsin -name $hName | Out-Null
+                                }
+                            }
+                        }
+
                         $json = '{"success":true}'
                         $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
                         $response.ContentType = "application/json; charset=utf-8"
