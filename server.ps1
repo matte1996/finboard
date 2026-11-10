@@ -1,4 +1,4 @@
-# ==========================================================================
+﻿# ==========================================================================
 # FINBOARD LOCAL POWERSHELL SERVER & FILE-SYSTEM API
 # Serves static files and acts as a local backend for directory creation,
 # CSV reading/writing, and CORS-free Yahoo Finance quote proxying.
@@ -348,7 +348,11 @@ function AutoRegister-HoldingCustomTicker {
     Write-Host "Attempting auto-discovery for custom ticker: $cleanTicker ($name)..." -ForegroundColor Cyan
     $discovered = Discover-BorsaItalianaMapping -ticker $cleanTicker -isin $isin -name $name
     if ($null -ne $discovered) {
-        Save-CustomTickerEntry -ticker $cleanTicker -entry $discovered | Out-Null
+        $storageTicker = $cleanTicker
+        if (-not $storageTicker.EndsWith(".MI") -and ($discovered.scraper -eq "borsa_italiana_gem" -or $storageTicker.StartsWith("1"))) {
+            $storageTicker = "$storageTicker.MI"
+        }
+        Save-CustomTickerEntry -ticker $storageTicker -entry $discovered | Out-Null
         return $discovered
     }
 

@@ -2417,16 +2417,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
             }
 
+            const tUpper = (h.ticker || '').toUpperCase().trim();
             const isSingleStock = (
                 assetType === 'Stocks' && 
                 !h.ticker.includes('.') && 
+                !tUpper.startsWith('1') &&
                 h.ticker !== 'CASH' &&
                 h.ticker !== 'BOND' &&
                 h.ticker !== 'BOT' &&
-                !h.ticker.toUpperCase().includes('BTC') &&
-                !h.ticker.toUpperCase().includes('ETH') &&
-                !h.ticker.toUpperCase().includes('XBT') &&
-                !h.ticker.toUpperCase().includes('CRYPTO')
+                !tUpper.includes('BTC') &&
+                !tUpper.includes('ETH') &&
+                !tUpper.includes('XBT') &&
+                !tUpper.includes('CRYPTO')
             );
 
             let targetTicker = h.ticker;
@@ -2446,12 +2448,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     wasConverted = true;
                 }
             } else {
-                const tUpper = (h.ticker || '').toUpperCase();
                 if (assetType === 'Bond') {
                     sourceMsg = "Borsa Italiana";
                 } else if (assetType.startsWith('Mixed') || (globalCustomTypologies[assetType] && globalCustomTypologies[assetType].type === 'mixed') || tUpper.includes('4PAPRST') || tUpper.includes('FONTE') || tUpper.includes('AMUNDI') || tUpper.includes('GENGRRB') || tUpper.includes('GENERALI')) {
                     sourceMsg = "Fondo Pensione";
-                } else if (h.ticker.includes('.')) {
+                } else if (h.ticker.includes('.') || tUpper.startsWith('1')) {
                     sourceMsg = "Borsa Europea (EUR)";
                 } else {
                     sourceMsg = "Diretto";
@@ -2462,12 +2463,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 const quote = await getStockQuote(targetTicker, forceRefresh);
                 
                 let currentPriceEUR = quote.price;
-                if (quote.currency === "USD" || wasConverted) {
+                if (quote.currency === "USD" || (!quote.currency && wasConverted)) {
                     currentPriceEUR = quote.price / cachedEURUSD;
                 }
 
-                // Save last resolved price to holding object for future estimation
-                h.lastPrice = quote.price;
+                if (quote.currency === "EUR" && sourceMsg === "Borsa USA (Convertito)") {
+                    sourceMsg = "Borsa Europea (EUR)";
+                } else if (quote.currency === "USD" && (sourceMsg === "Borsa Internazionale" || sourceMsg === "Diretto")) {
+                    sourceMsg = "Borsa USA (Convertito)";
+                }
+
+                // Save last resolved EUR price to holding object for future estimation
+                h.lastPrice = currentPriceEUR;
 
                 const buyCost = h.shares * h.buyPrice;
                 const currentValue = h.shares * currentPriceEUR;
