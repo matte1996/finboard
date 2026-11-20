@@ -1592,11 +1592,9 @@ while ($listener.IsListening) {
                 
                 if (Test-Path $metaPath) {
                     try {
-                        # Load folder metadata
+                        # Load folder metadata (folder name governs id and name so cloned/renamed folders stay isolated)
                         $metaContent = Get-Content -Path $metaPath -Raw -Encoding UTF8
                         $metaJson = $metaContent | ConvertFrom-Json
-                        if ($metaJson.id) { $meta.id = $metaJson.id }
-                        if ($metaJson.name) { $meta.name = $metaJson.name }
                         if ($metaJson.desc) { $meta.desc = $metaJson.desc }
                         if ($metaJson.cash -ne $null) { $meta.cash = [double]$metaJson.cash }
                         if ($metaJson.lastRealTimeValue -ne $null) { $meta.lastRealTimeValue = [double]$metaJson.lastRealTimeValue }
