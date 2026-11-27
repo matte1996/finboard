@@ -511,6 +511,10 @@
                 <button class="tab-btn" data-target="tab-search">
                     <i data-lucide="search"></i> Cerca Titolo
                 </button>
+                <button class="tab-btn" data-target="tab-notes" id="tab-btn-notes">
+                    <i data-lucide="sticky-note"></i> Note
+                    <span id="notes-active-dot" class="tab-notification-dot hidden" title="Ci sono note attive per questo portafoglio"></span>
+                </button>
             </nav>
 
             <!-- TAB CONTENT VIEWS -->
@@ -975,6 +979,54 @@
                                 </ul>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- ==================== TAB 4: NOTE ==================== -->
+                <div id="tab-notes" class="tab-panel">
+                    <div class="panel-layout-grid-3">
+
+                        <!-- Add / Edit Note Form Card -->
+                        <div class="card col-span-2">
+                            <div class="card-header">
+                                <h2 id="note-form-title">Nuova Nota</h2>
+                                <p class="card-subtitle">Salva promemoria, strategie o osservazioni specifiche per questo portafoglio.</p>
+                            </div>
+                            <form id="form-portfolio-note" style="display: flex; flex-direction: column; gap: 16px;">
+                                <input type="hidden" id="note-edit-id" value="">
+                                <div class="form-group">
+                                    <label for="note-title">Titolo (opzionale)</label>
+                                    <input type="text" id="note-title" maxlength="120" placeholder="Titolo (opzionale, es. Ribilanciamento)">
+                                </div>
+                                <div class="form-group">
+                                    <label for="note-text">Contenuto Nota</label>
+                                    <textarea id="note-text" rows="6" required placeholder="Scrivi qui la tua nota..."></textarea>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" id="btn-cancel-note-edit" class="btn btn-secondary hidden">Annulla</button>
+                                    <button type="submit" id="btn-save-note" class="btn btn-primary">
+                                        <i data-lucide="plus"></i> Aggiungi Nota
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Saved Notes List Card -->
+                        <div class="card col-span-2">
+                            <div class="card-header flex-between">
+                                <h2>Note Salvate</h2>
+                                <span class="badge badge-accent" id="notes-count-badge">0 note</span>
+                            </div>
+
+                            <div id="notes-list-container" class="notes-list"></div>
+
+                            <div id="notes-empty-state" class="empty-state">
+                                <i data-lucide="sticky-note" class="empty-icon"></i>
+                                <h3>Nessuna nota presente</h3>
+                                <p>Aggiungi una nota a sinistra per tenerne traccia in questo portafoglio.</p>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 

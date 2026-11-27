@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.portfolios) {
                 Object.values(state.portfolios).forEach(p => {
                     p.customTypologies = p.customTypologies || {};
+                    p.notes = Array.isArray(p.notes) ? p.notes : (p.notes ? [p.notes] : []);
                 });
             }
         } catch (e) {
@@ -375,6 +376,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         p.customTypologies = p.customTypologies || {};
                         p.manualDeposits = p.manualDeposits || [];
+                        p.notes = Array.isArray(p.notes) ? p.notes : (p.notes ? [p.notes] : []);
                         state.portfolios[p.id] = p;
                     });
                     
@@ -412,7 +414,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         lastRealTimeValue: port.lastRealTimeValue,
                         holdings: port.holdings,
                         customTypologies: port.customTypologies || {},
-                        manualDeposits: port.manualDeposits || []
+                        manualDeposits: port.manualDeposits || [],
+                        notes: port.notes || []
                     })
                 });
             } catch (e) {
@@ -989,6 +992,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (target === 'tab-deposits') {
                 depositsCurrentPage = 1;
                 renderDepositsTable();
+            } else if (target === 'tab-notes') {
+                renderNotesList();
             }
         });
     });
@@ -1056,7 +1061,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 cash,
                 desc: desc || "Nessuna descrizione.",
                 holdings: [],
-                patrimonioCsvData: []
+                patrimonioCsvData: [],
+                notes: []
             };
             saveState();
             closeAddPortfolioForm();
@@ -1641,6 +1647,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateMarketStatusIndicator();
         updateFolderSyncUI();
         populateAssetTypeDropdown();
+        resetNoteForm();
+        updateNotesBadge();
+        renderNotesList();
         
         // 1. Try reading the patrimonio.csv from portfolio directory
         if (serverMode) {
@@ -5884,6 +5893,216 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnSaveMgrTypology.disabled = false;
                 btnSaveMgrTypology.innerHTML = '<i data-lucide="check" style="width: 14px; height: 14px;"></i> Salva Tipologia';
                 lucide.createIcons();
+            }
+        });
+    }
+
+    // --------------------------------------------------------------------------
+    // 15. SECTION: PORTFOLIO NOTES MANAGEMENT
+    // --------------------------------------------------------------------------
+    const formPortfolioNote = document.getElementById('form-portfolio-note');
+    const noteFormTitle = document.getElementById('note-form-title');
+    const noteEditIdInput = document.getElementById('note-edit-id');
+    const noteTitleInput = document.getElementById('note-title');
+    const noteTextInput = document.getElementById('note-text');
+    const btnCancelNoteEdit = document.getElementById('btn-cancel-note-edit');
+    const btnSaveNote = document.getElementById('btn-save-note');
+    const notesListContainer = document.getElementById('notes-list-container');
+    const notesEmptyState = document.getElementById('notes-empty-state');
+    const notesCountBadge = document.getElementById('notes-count-badge');
+    const notesActiveDot = document.getElementById('notes-active-dot');
+
+    function updateNotesBadge() {
+        const activePort = getActivePortfolio();
+        const notes = (activePort && Array.isArray(activePort.notes)) ? activePort.notes : [];
+        const count = notes.length;
+
+        if (notesActiveDot) {
+            if (count > 0) {
+                notesActiveDot.classList.remove('hidden');
+                notesActiveDot.title = count === 1 ? '1 nota attiva' : `${count} note attive`;
+            } else {
+                notesActiveDot.classList.add('hidden');
+                notesActiveDot.title = 'Nessuna nota attiva';
+            }
+        }
+        if (notesCountBadge) {
+            notesCountBadge.innerText = count === 1 ? '1 nota' : `${count} note`;
+        }
+    }
+
+    function formatNoteDate(isoStr) {
+        if (!isoStr) return '';
+        try {
+            const d = new Date(isoStr);
+            if (isNaN(d.getTime())) return '';
+            const datePart = d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const timePart = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+            return `${datePart} ${timePart}`;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function resetNoteForm() {
+        if (noteEditIdInput) noteEditIdInput.value = '';
+        if (noteTitleInput) noteTitleInput.value = '';
+        if (noteTextInput) noteTextInput.value = '';
+        if (noteFormTitle) noteFormTitle.innerText = 'Nuova Nota';
+        if (btnCancelNoteEdit) btnCancelNoteEdit.classList.add('hidden');
+        if (btnSaveNote) {
+            btnSaveNote.innerHTML = '<i data-lucide="plus"></i> Aggiungi Nota';
+            lucide.createIcons();
+        }
+    }
+
+    function renderNotesList() {
+        updateNotesBadge();
+        if (!notesListContainer || !notesEmptyState) return;
+
+        const activePort = getActivePortfolio();
+        const notes = (activePort && Array.isArray(activePort.notes)) ? activePort.notes : [];
+
+        notesListContainer.innerHTML = '';
+
+        if (notes.length === 0) {
+            notesListContainer.classList.add('hidden');
+            notesEmptyState.classList.remove('hidden');
+            lucide.createIcons();
+            return;
+        }
+
+        notesListContainer.classList.remove('hidden');
+        notesEmptyState.classList.add('hidden');
+
+        const editingId = noteEditIdInput ? noteEditIdInput.value : '';
+        const sortedNotes = [...notes].sort((a, b) => {
+            const ta = new Date(a.updatedAt || a.createdAt || 0).getTime();
+            const tb = new Date(b.updatedAt || b.createdAt || 0).getTime();
+            return tb - ta;
+        });
+
+        sortedNotes.forEach(note => {
+            const item = document.createElement('div');
+            item.className = `note-item${editingId && editingId === note.id ? ' editing' : ''}`;
+
+            const safeTitle = escapeHTML(note.title || 'Nota');
+            const safeBody = escapeHTML(note.text || '');
+            const isModified = note.updatedAt && note.createdAt && note.updatedAt !== note.createdAt;
+            const dateText = formatNoteDate(note.updatedAt || note.createdAt);
+            const metaText = dateText ? `${isModified ? 'Modificata' : 'Creata'} il ${dateText}` : '';
+
+            item.innerHTML = `
+                <div class="note-item-header">
+                    <div>
+                        <div class="note-item-title">${safeTitle}</div>
+                        ${metaText ? `<div class="note-item-meta">${escapeHTML(metaText)}</div>` : ''}
+                    </div>
+                    <div class="note-item-actions">
+                        <button type="button" class="btn-tiny btn-edit-note" title="Modifica Nota" data-note-id="${escapeHTML(note.id)}">
+                            <i data-lucide="pencil" style="width: 14px; height: 14px;"></i>
+                        </button>
+                        <button type="button" class="btn-tiny btn-delete-note text-danger" title="Elimina Nota" data-note-id="${escapeHTML(note.id)}">
+                            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="note-item-body">${safeBody}</div>
+            `;
+
+            const btnEdit = item.querySelector('.btn-edit-note');
+            if (btnEdit) {
+                btnEdit.addEventListener('click', () => {
+                    if (noteEditIdInput) noteEditIdInput.value = note.id;
+                    if (noteTitleInput) noteTitleInput.value = note.title || '';
+                    if (noteTextInput) {
+                        noteTextInput.value = note.text || '';
+                        noteTextInput.focus();
+                    }
+                    if (noteFormTitle) noteFormTitle.innerText = 'Modifica Nota';
+                    if (btnCancelNoteEdit) btnCancelNoteEdit.classList.remove('hidden');
+                    if (btnSaveNote) btnSaveNote.innerHTML = '<i data-lucide="check"></i> Salva Modifiche';
+                    renderNotesList();
+                });
+            }
+
+            const btnDelete = item.querySelector('.btn-delete-note');
+            if (btnDelete) {
+                btnDelete.addEventListener('click', async () => {
+                    if (!confirm('Sei sicuro di voler eliminare questa nota?')) return;
+                    const port = getActivePortfolio();
+                    if (!port || !Array.isArray(port.notes)) return;
+                    port.notes = port.notes.filter(n => n.id !== note.id);
+                    await savePortfolioMetadata();
+                    if (noteEditIdInput && noteEditIdInput.value === note.id) {
+                        resetNoteForm();
+                    }
+                    renderNotesList();
+                });
+            }
+
+            notesListContainer.appendChild(item);
+        });
+
+        lucide.createIcons();
+    }
+
+    if (btnCancelNoteEdit) {
+        btnCancelNoteEdit.addEventListener('click', () => {
+            resetNoteForm();
+            renderNotesList();
+        });
+    }
+
+    if (formPortfolioNote) {
+        formPortfolioNote.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const activePort = getActivePortfolio();
+            if (!activePort) return;
+
+            const titleVal = noteTitleInput ? noteTitleInput.value.trim() : '';
+            const textVal = noteTextInput ? noteTextInput.value.trim() : '';
+            if (!textVal) return;
+
+            if (!Array.isArray(activePort.notes)) {
+                activePort.notes = [];
+            }
+
+            if (btnSaveNote) btnSaveNote.disabled = true;
+            try {
+                const nowIso = new Date().toISOString();
+                const editId = noteEditIdInput ? noteEditIdInput.value : '';
+
+                if (editId) {
+                    const existing = activePort.notes.find(n => n.id === editId);
+                    if (existing) {
+                        existing.title = titleVal;
+                        existing.text = textVal;
+                        existing.updatedAt = nowIso;
+                    } else {
+                        activePort.notes.push({
+                            id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                            title: titleVal,
+                            text: textVal,
+                            createdAt: nowIso,
+                            updatedAt: nowIso
+                        });
+                    }
+                } else {
+                    activePort.notes.push({
+                        id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                        title: titleVal,
+                        text: textVal,
+                        createdAt: nowIso,
+                        updatedAt: nowIso
+                    });
+                }
+
+                await savePortfolioMetadata();
+                resetNoteForm();
+                renderNotesList();
+            } finally {
+                if (btnSaveNote) btnSaveNote.disabled = false;
             }
         });
     }

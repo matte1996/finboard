@@ -1588,6 +1588,7 @@ while ($listener.IsListening) {
                     holdings = @()
                     customTypologies = @{}
                     manualDeposits = @()
+                    notes = @()
                 }
                 
                 if (Test-Path $metaPath) {
@@ -1601,6 +1602,7 @@ while ($listener.IsListening) {
                         if ($metaJson.holdings) { $meta.holdings = $metaJson.holdings }
                         if ($metaJson.customTypologies) { $meta.customTypologies = $metaJson.customTypologies }
                         if ($metaJson.manualDeposits) { $meta.manualDeposits = $metaJson.manualDeposits }
+                        if ($metaJson.notes) { $meta.notes = @($metaJson.notes) }
                     } catch {
                         # Corrupted metadata.json will be rewritten
                     }
@@ -1647,6 +1649,7 @@ while ($listener.IsListening) {
                         holdings = @()
                         customTypologies = @{}
                         manualDeposits = @()
+                        notes = @()
                     }
                     $metaPath = Join-Path $dirPath "metadata.json"
                     $meta | ConvertTo-Json -Depth 4 | Out-File -FilePath $metaPath -Encoding UTF8

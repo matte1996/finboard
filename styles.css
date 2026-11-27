@@ -930,6 +930,21 @@ textarea {
     background-color: var(--color-accent-primary);
 }
 
+.tab-notification-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--color-accent-danger);
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
+    display: inline-block;
+    flex-shrink: 0;
+    margin-left: 2px;
+}
+
+.tab-notification-dot.hidden {
+    display: none;
+}
+
 /* Panel containers */
 .tab-panel {
     display: none;
@@ -2424,6 +2439,84 @@ body.light-theme #chartjs-html-tooltip {
 #btn-toggle-theme-aggregate:hover i {
     transform: rotate(20deg) scale(1.1);
     transition: transform 0.2s ease;
+}
+
+/* ==================== TAB 4 CONTENT (NOTES) ==================== */
+.notes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.note-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 16px;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.note-item:hover {
+    border-color: var(--color-border-hover);
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.note-item.editing {
+    border-color: var(--color-accent-primary);
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.25);
+}
+
+.note-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.note-item-title {
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+.note-item-meta {
+    font-size: 0.72rem;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+}
+
+.note-item-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.note-item-body {
+    font-size: 0.88rem;
+    color: var(--color-text-secondary);
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+body.light-theme .note-item {
+    background: #ffffff;
+    border-color: rgba(15, 23, 42, 0.08);
+}
+
+body.light-theme .note-item:hover {
+    background: #f8fafc;
+    border-color: rgba(15, 23, 42, 0.16);
+}
+
+body.light-theme .note-item-title {
+    color: #0f172a;
+}
+
+body.light-theme .note-item-body {
+    color: #334155;
 }
 
 
